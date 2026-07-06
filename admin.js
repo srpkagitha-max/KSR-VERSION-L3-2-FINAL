@@ -209,3 +209,106 @@ function normalizePdfQuestions(text){
 document.addEventListener("click", function(e){
   if(e.target && e.target.id === "importPdfBtn") importPdfQuestions();
 });
+
+
+// L3.5 STANDARD PDF IMPORT - safe workflow
+async function importPdfQuestionsStandard(){
+  const fileEl = $("pdfFile");
+  const msgEl = $("pdfImportMsg");
+  const qualityBox = $("pdfQualityBox");
+  try{
+    if(!fileEl || !fileEl.files || !fileEl.files[0]) return alert("Please select a PDF file");
+    if(msgEl) msgEl.innerHTML = '<span class="pdf-warn">Reading PDF text... please wait</span>';
+    if(qualityBox){ qualityBox.classList.remove("hide"); qualityBox.innerHTML = "Checking PDF quality..."; }
+
+    const mod = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs");
+    mod.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
+
+    const data = await fileEl.files[0].arrayBuffer();
+    const pdf = await mod.getDocument({data}).promise;
+    let pages = [];
+
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(content.items.map(x=>x.str).join(" "));
+    }
+
+    const rawText = pages.join("\n");
+    const formatted = normalizePdfQuestionsStandard(rawText);
+    const stats = analyzeImportedQuestions(formatted, rawText, pdf.numPages);
+
+    const bits = $("bits");
+    if(!bits) return alert("Questions textarea not found");
+    bits.value = formatted || rawText;
+
+    if(msgEl) msgEl.innerHTML = '<span class="pdf-ok">PDF import completed. Review questions before Save Exam.</span>';
+    if(qualityBox){
+      qualityBox.innerHTML =
+        '<b>PDF Import Quality Report</b><br>' +
+        'Pages: ' + pdf.numPages + '<br>' +
+        'Detected Questions: ' + stats.questions + '<br>' +
+        'Detected Options: ' + stats.options + '<br>' +
+        'Detected Answers: ' + stats.answers + '<br>' +
+        '<div class="' + stats.cls + '">' + stats.message + '</div>' +
+        '<div class="import-help"><b>Standard workflow:</b><br>' +
+        '1. Review imported questions in textarea.<br>' +
+        '2. If answer keys are missing, add lines like <b>Answer: B</b>.<br>' +
+        '3. Then click <b>Save Exam + Generate Codes</b>.</div>';
+    }
+    alert(stats.alert);
+  }catch(e){
+    if(msgEl) msgEl.innerHTML = '<span class="pdf-bad">PDF import failed: ' + e.message + '</span>';
+    if(qualityBox){ qualityBox.classList.remove("hide"); qualityBox.innerHTML = '<span class="quality-bad">PDF import failed. This PDF may be scanned/image-only or browser blocked.</span>'; }
+    alert("PDF import failed: " + e.message);
+  }
+}
+function normalizePdfQuestionsStandard(text){
+  let t = String(text||"")
+    .replace(/\r/g,"\n")
+    .replace(/[ \t]+/g," ")
+    .replace(/([0-9]+[\.\)])\s*/g,"\n$1 ")
+    .replace(/\s+([A-Da-d])[\.\)]\s*/g,"\n$1. ")
+    .replace(/\s+(Answer|Ans|Correct Answer|సమాధానం)\s*[:：\-]\s*([A-Da-d])/gi,"\nAnswer: $2\n")
+    .replace(/\s+([A-Da-d])\s*[●⚫✔✓]\s*/g,"\nAnswer: $1\n")
+    .replace(/\n{2,}/g,"\n")
+    .trim();
+
+  const lines = t.split("\n").map(x=>x.trim()).filter(Boolean);
+  const out = [];
+  let n = 0;
+
+  for(const line of lines){
+    if(/^\d+[\.\)]/.test(line)){
+      n++;
+      out.push(line.replace(/^(\d+)[\.\)]\s*/, n + ". "));
+    }else if(/^[A-Da-d][\.\)]/.test(line)){
+      out.push(line.replace(/^([A-Da-d])[\.\)]\s*/, (m,p)=>p.toUpperCase()+". "));
+    }else if(/^(Answer|Ans|Correct Answer|సమాధానం)\s*[:：\-]/i.test(line)){
+      out.push(line.replace(/^(Answer|Ans|Correct Answer|సమాధానం)\s*[:：\-]\s*/i,"Answer: "));
+    }else if(out.length && !/^[A-D]\./.test(out[out.length-1]) && !/^Answer:/i.test(out[out.length-1])){
+      out[out.length-1] += " " + line;
+    }else{
+      out.push(line);
+    }
+  }
+  return out.join("\n");
+}
+function analyzeImportedQuestions(formatted, raw, pages){
+  const q = (formatted.match(/^\d+\.\s/gm)||[]).length;
+  const o = (formatted.match(/^[A-D]\.\s/gm)||[]).length;
+  const a = (formatted.match(/^Answer:\s*[A-D]/gmi)||[]).length;
+  const rawLen = String(raw||"").trim().length;
+
+  if(rawLen < 50) return {questions:q,options:o,answers:a,cls:"quality-bad",message:"Scanned/image PDF laga undi. Text dorakaledu. OCR version kavali.",alert:"PDF text not detected. This may be scanned PDF."};
+  if(q===0 || o < q*3) return {questions:q,options:o,answers:a,cls:"quality-mid",message:"Partial import. Format review cheyyali.",alert:"PDF imported partially. Please review format."};
+  if(a < q) return {questions:q,options:o,answers:a,cls:"quality-mid",message:"Questions/options detected, but some answers missing. Answer: A/B/C/D add cheyyi.",alert:"PDF imported. Some answers may be missing."};
+  return {questions:q,options:o,answers:a,cls:"quality-good",message:"Good import. Review once and save.",alert:"PDF imported successfully."};
+}
+document.addEventListener("click", function(e){
+  if(e.target && e.target.id === "importPdfBtn"){
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    importPdfQuestionsStandard();
+  }
+}, true);
