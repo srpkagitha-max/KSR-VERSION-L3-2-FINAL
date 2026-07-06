@@ -136,3 +136,220 @@ async function loadStats(){
   const ex=await getDocs(collection(db,"exams")); const st=await getDocs(collection(db,"students"));
   $("statsBox").innerHTML=`<div class="stat"><div class="label">Students</div><div class="value">${st.size}</div></div><div class="stat"><div class="label">Exams</div><div class="value">${ex.size}</div></div>`;
 }
+
+
+async function checkDbHealth(){
+  try{
+    if($("dbHealthBox")) $("dbHealthBox").innerHTML="Checking Firebase Cloud Database...";
+    const examsSnap = await getDocs(collection(db,"exams"));
+    let attempts = 0;
+    for(const d of examsSnap.docs){
+      const a = await getDocs(collection(db,"exams",d.id,"attempts"));
+      attempts += a.size;
+    }
+    if($("dbHealthBox")) $("dbHealthBox").innerHTML =
+      `<b>✅ Firebase Cloud Database Connected</b><br>`+
+      `Exams: ${examsSnap.size}<br>`+
+      `Attempts: ${attempts}<br>`+
+      `Status: Online Save / Reports Ready`;
+    alert("Firebase DB connected successfully");
+  }catch(e){
+    if($("dbHealthBox")) $("dbHealthBox").innerHTML = `<span class="bad">❌ Firebase DB Error: ${e.message}</span>`;
+    alert("Firebase DB Error: "+e.message);
+  }
+}
+
+
+async function importPdfQuestions(){
+  const fileEl = $("pdfFile");
+  const msgEl = $("pdfImportMsg");
+  try{
+    if(!fileEl || !fileEl.files || !fileEl.files[0]) return alert("Please select PDF file");
+    if(msgEl) msgEl.innerHTML = '<span class="pdf-warn">Reading PDF...</span>';
+    const mod = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs");
+    mod.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
+    const data = await fileEl.files[0].arrayBuffer();
+    const pdf = await mod.getDocument({data}).promise;
+    let text = "";
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(x=>x.str).join(" ") + "\n";
+    }
+    const formatted = normalizePdfQuestions(text);
+    $("bits").value = formatted || text;
+    if(msgEl) msgEl.innerHTML = `<span class="pdf-ok">Imported ${pdf.numPages} page(s). Review and Save Exam.</span>`;
+    alert("PDF imported. Please review before saving.");
+  }catch(e){
+    if(msgEl) msgEl.innerHTML = `<span class="pdf-bad">PDF import failed: ${e.message}</span>`;
+    alert("PDF import failed: "+e.message);
+  }
+}
+function normalizePdfQuestions(text){
+  let t = String(text||"")
+    .replace(/\r/g,"\n")
+    .replace(/[ \t]+/g," ")
+    .replace(/(\d+[\.\)])\s*/g,"\n$1 ")
+    .replace(/\s+([A-Da-d])[\.\)]\s*/g,"\n$1. ")
+    .replace(/\s+(Answer|Ans|సమాధానం)\s*[:：]\s*([A-Da-d])/gi,"\nAnswer: $2\n")
+    .replace(/\n{2,}/g,"\n").trim();
+  const lines=t.split("\n").map(x=>x.trim()).filter(Boolean), out=[];
+  let n=0;
+  for(const line of lines){
+    if(/^\d+[\.\)]/.test(line)){n++; out.push(line.replace(/^(\d+)[\.\)]\s*/, n+". "));}
+    else if(/^[A-Da-d][\.\)]/.test(line)){out.push(line.replace(/^([A-Da-d])[\.\)]\s*/, (m,p)=>p.toUpperCase()+". "));}
+    else if(/^(Answer|Ans|సమాధానం)\s*[:：]/i.test(line)){out.push(line.replace(/^(Answer|Ans|సమాధానం)\s*[:：]\s*/i,"Answer: "));}
+    else if(out.length && !/^[A-D]\./.test(out[out.length-1]) && !/^Answer:/i.test(out[out.length-1])) out[out.length-1]+=" "+line;
+    else out.push(line);
+  }
+  return out.join("\n");
+}
+
+// PDF_IMPORT_BIND_L35
+document.addEventListener("click", function(e){
+  if(e.target && e.target.id === "importPdfBtn") importPdfQuestions();
+});
+
+
+// L3.5 STANDARD PDF IMPORT - safe workflow
+async function importPdfQuestionsStandard(){
+  const fileEl = $("pdfFile");
+  const msgEl = $("pdfImportMsg");
+  const qualityBox = $("pdfQualityBox");
+  try{
+    if(!fileEl || !fileEl.files || !fileEl.files[0]) return alert("Please select a PDF file");
+    if(msgEl) msgEl.innerHTML = '<span class="pdf-warn">Reading PDF text... please wait</span>';
+    if(qualityBox){ qualityBox.classList.remove("hide"); qualityBox.innerHTML = "Checking PDF quality..."; }
+
+    const mod = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs");
+    mod.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
+
+    const data = await fileEl.files[0].arrayBuffer();
+    const pdf = await mod.getDocument({data}).promise;
+    let pages = [];
+
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      pages.push(content.items.map(x=>x.str).join(" "));
+    }
+
+    const rawText = pages.join("\n");
+    const formatted = normalizePdfQuestionsStandard(rawText);
+    const stats = analyzeImportedQuestions(formatted, rawText, pdf.numPages);
+
+    const bits = $("bits");
+    if(!bits) return alert("Questions textarea not found");
+    bits.value = formatted || rawText;
+
+    if(msgEl) msgEl.innerHTML = '<span class="pdf-ok">PDF import completed. Review questions before Save Exam.</span>';
+    if(qualityBox){
+      qualityBox.innerHTML =
+        '<b>PDF Import Quality Report</b><br>' +
+        'Pages: ' + pdf.numPages + '<br>' +
+        'Detected Questions: ' + stats.questions + '<br>' +
+        'Detected Options: ' + stats.options + '<br>' +
+        'Detected Answers: ' + stats.answers + '<br>' +
+        '<div class="' + stats.cls + '">' + stats.message + '</div>' +
+        '<div class="import-help"><b>Standard workflow:</b><br>' +
+        '1. Review imported questions in textarea.<br>' +
+        '2. If answer keys are missing, add lines like <b>Answer: B</b>.<br>' +
+        '3. Then click <b>Save Exam + Generate Codes</b>.</div>';
+    }
+    alert(stats.alert);
+  }catch(e){
+    if(msgEl) msgEl.innerHTML = '<span class="pdf-bad">PDF import failed: ' + e.message + '</span>';
+    if(qualityBox){ qualityBox.classList.remove("hide"); qualityBox.innerHTML = '<span class="quality-bad">PDF import failed. This PDF may be scanned/image-only or browser blocked.</span>'; }
+    alert("PDF import failed: " + e.message);
+  }
+}
+function normalizePdfQuestionsStandard(text){
+  let t = String(text||"")
+    .replace(/\r/g,"\n")
+    .replace(/[ \t]+/g," ")
+    .replace(/([0-9]+[\.\)])\s*/g,"\n$1 ")
+    .replace(/\s+([A-Da-d])[\.\)]\s*/g,"\n$1. ")
+    .replace(/\s+(Answer|Ans|Correct Answer|సమాధానం)\s*[:：\-]\s*([A-Da-d])/gi,"\nAnswer: $2\n")
+    .replace(/\s+([A-Da-d])\s*[●⚫✔✓]\s*/g,"\nAnswer: $1\n")
+    .replace(/\n{2,}/g,"\n")
+    .trim();
+
+  const lines = t.split("\n").map(x=>x.trim()).filter(Boolean);
+  const out = [];
+  let n = 0;
+
+  for(const line of lines){
+    if(/^\d+[\.\)]/.test(line)){
+      n++;
+      out.push(line.replace(/^(\d+)[\.\)]\s*/, n + ". "));
+    }else if(/^[A-Da-d][\.\)]/.test(line)){
+      out.push(line.replace(/^([A-Da-d])[\.\)]\s*/, (m,p)=>p.toUpperCase()+". "));
+    }else if(/^(Answer|Ans|Correct Answer|సమాధానం)\s*[:：\-]/i.test(line)){
+      out.push(line.replace(/^(Answer|Ans|Correct Answer|సమాధానం)\s*[:：\-]\s*/i,"Answer: "));
+    }else if(out.length && !/^[A-D]\./.test(out[out.length-1]) && !/^Answer:/i.test(out[out.length-1])){
+      out[out.length-1] += " " + line;
+    }else{
+      out.push(line);
+    }
+  }
+  return out.join("\n");
+}
+function analyzeImportedQuestions(formatted, raw, pages){
+  const q = (formatted.match(/^\d+\.\s/gm)||[]).length;
+  const o = (formatted.match(/^[A-D]\.\s/gm)||[]).length;
+  const a = (formatted.match(/^Answer:\s*[A-D]/gmi)||[]).length;
+  const rawLen = String(raw||"").trim().length;
+
+  if(rawLen < 50) return {questions:q,options:o,answers:a,cls:"quality-bad",message:"Scanned/image PDF laga undi. Text dorakaledu. OCR version kavali.",alert:"PDF text not detected. This may be scanned PDF."};
+  if(q===0 || o < q*3) return {questions:q,options:o,answers:a,cls:"quality-mid",message:"Partial import. Format review cheyyali.",alert:"PDF imported partially. Please review format."};
+  if(a < q) return {questions:q,options:o,answers:a,cls:"quality-mid",message:"Questions/options detected, but some answers missing. Answer: A/B/C/D add cheyyi.",alert:"PDF imported. Some answers may be missing."};
+  return {questions:q,options:o,answers:a,cls:"quality-good",message:"Good import. Review once and save.",alert:"PDF imported successfully."};
+}
+document.addEventListener("click", function(e){
+  if(e.target && e.target.id === "importPdfBtn"){
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    importPdfQuestionsStandard();
+  }
+}, true);
+
+
+// L3.6 OCR SCANNED PDF
+async function ocrScannedPdfQuestions(){
+  const fileEl=$("pdfFile"), msgEl=$("pdfImportMsg"), qualityBox=$("pdfQualityBox");
+  try{
+    if(!fileEl || !fileEl.files || !fileEl.files[0]) return alert("Please select scanned/image PDF");
+    if(msgEl) msgEl.innerHTML='<span class="pdf-warn">OCR starting... do not close page.</span>';
+    if(qualityBox){qualityBox.classList.remove("hide");qualityBox.innerHTML='<div class="ocr-progress">Loading OCR engine...</div>';}
+    const pdfjs=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
+    const tess=await import("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/+esm");
+    const data=await fileEl.files[0].arrayBuffer();
+    const pdf=await pdfjs.getDocument({data}).promise;
+    const worker=await tess.createWorker(["eng","tel"],1,{logger:m=>{if(qualityBox&&m.status){qualityBox.innerHTML='<div class="ocr-progress">OCR: '+m.status+' '+(m.progress?Math.round(m.progress*100):'')+'%</div>';}}});
+    let allText="", maxPages=Math.min(pdf.numPages,35);
+    for(let i=1;i<=maxPages;i++){
+      if(qualityBox) qualityBox.innerHTML='<div class="ocr-progress">OCR Page '+i+' / '+maxPages+' running...</div>';
+      const page=await pdf.getPage(i), viewport=page.getViewport({scale:2});
+      const canvas=document.createElement("canvas"), ctx=canvas.getContext("2d");
+      canvas.width=viewport.width; canvas.height=viewport.height;
+      await page.render({canvasContext:ctx,viewport}).promise;
+      const res=await worker.recognize(canvas);
+      allText+="\n"+(res.data.text||"");
+    }
+    await worker.terminate();
+    const formatted=(typeof normalizePdfQuestionsStandard==="function")?normalizePdfQuestionsStandard(allText):allText;
+    $("bits").value=formatted||allText;
+    const q=(formatted.match(/^\d+\.\s/gm)||[]).length, o=(formatted.match(/^[A-D]\.\s/gm)||[]).length, a=(formatted.match(/^Answer:\s*[A-D]/gmi)||[]).length;
+    if(msgEl) msgEl.innerHTML='<span class="pdf-ok">OCR completed. Review questions before Save Exam.</span>';
+    if(qualityBox) qualityBox.innerHTML='<b>OCR Import Quality Report</b><br>Pages OCR Done: '+maxPages+' / '+pdf.numPages+'<br>Detected Questions: '+q+'<br>Detected Options: '+o+'<br>Detected Answers: '+a+'<div class="ocr-note"><b>Important:</b><br>OCR mistakes ravachu. Questions/options/answers verify chesi Save Exam cheyyi.</div>';
+    alert("OCR completed. Please review before saving.");
+  }catch(e){
+    if(msgEl) msgEl.innerHTML='<span class="pdf-bad">OCR failed: '+e.message+'</span>';
+    if(qualityBox){qualityBox.classList.remove("hide");qualityBox.innerHTML='<span class="quality-bad">OCR failed. Mobile memory/network issue kavachu. Smaller PDF try cheyyi.</span>';}
+    alert("OCR failed: "+e.message);
+  }
+}
+document.addEventListener("click",function(e){
+  if(e.target && e.target.id==="ocrPdfBtn"){e.preventDefault();e.stopImmediatePropagation();ocrScannedPdfQuestions();}
+},true);

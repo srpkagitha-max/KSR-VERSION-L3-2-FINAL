@@ -33,3 +33,10 @@ table{width:100%;border-collapse:collapse;font-size:14px;background:#fff}td,th{b
 .leader-title{font-size:22px;font-weight:900;margin:10px 0}
 .rank-badge{display:inline-block;min-width:42px;text-align:center;border-radius:999px;background:#0b57d0;color:#fff;padding:6px 10px;font-weight:900}
 .pass{color:#137333;font-weight:900}.fail{color:#d93025;font-weight:900}
+
+.pdf-ok{color:#137333;font-weight:900}.pdf-bad{color:#d93025;font-weight:900}.pdf-warn{color:#b06000;font-weight:900}
+
+.quality-good{color:#137333;font-weight:900}.quality-mid{color:#b06000;font-weight:900}.quality-bad{color:#d93025;font-weight:900}
+.import-help{background:#f8fbff;border:1px solid #dbe7ff;border-radius:14px;padding:12px;margin:10px 0;line-height:1.5}
+
+.ocr-progress{background:#fff8db;border:1px solid #fbbc04;border-radius:14px;padding:12px;margin:10px 0;font-weight:900}.ocr-note{background:#f8fbff;border:1px solid #dbe7ff;border-radius:14px;padding:12px;margin:10px 0;line-height:1.5}
