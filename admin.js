@@ -136,3 +136,25 @@ async function loadStats(){
   const ex=await getDocs(collection(db,"exams")); const st=await getDocs(collection(db,"students"));
   $("statsBox").innerHTML=`<div class="stat"><div class="label">Students</div><div class="value">${st.size}</div></div><div class="stat"><div class="label">Exams</div><div class="value">${ex.size}</div></div>`;
 }
+
+
+async function checkDbHealth(){
+  try{
+    if($("dbHealthBox")) $("dbHealthBox").innerHTML="Checking Firebase Cloud Database...";
+    const examsSnap = await getDocs(collection(db,"exams"));
+    let attempts = 0;
+    for(const d of examsSnap.docs){
+      const a = await getDocs(collection(db,"exams",d.id,"attempts"));
+      attempts += a.size;
+    }
+    if($("dbHealthBox")) $("dbHealthBox").innerHTML =
+      `<b>✅ Firebase Cloud Database Connected</b><br>`+
+      `Exams: ${examsSnap.size}<br>`+
+      `Attempts: ${attempts}<br>`+
+      `Status: Online Save / Reports Ready`;
+    alert("Firebase DB connected successfully");
+  }catch(e){
+    if($("dbHealthBox")) $("dbHealthBox").innerHTML = `<span class="bad">❌ Firebase DB Error: ${e.message}</span>`;
+    alert("Firebase DB Error: "+e.message);
+  }
+}
