@@ -1,142 +1,16 @@
 import { db } from './firebase-config.js';
-import { doc, getDoc, setDoc, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
+import { doc,getDoc,setDoc,serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
 
-const $ = (id) => document.getElementById(id);
-let EXAM=null,Q=[],cur=0,ans=[],rev=[],sec=0,totalSec=0,timer=null,student="",phone="",eid="",code="",started=false,submitted=false;
-
-function shuf(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
-function tick(){ const m=Math.floor(sec/60), s=sec%60; $("timer").textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0"); }
-function now(){ return new Date(); }
-
-$("startBtn").addEventListener("click", async()=>{ try { $("startBtn").disabled=true;
-  student=$("stName").value.trim(); phone=$("stPhone").value.trim(); eid=$("stExamId").value.trim().toUpperCase(); code=$("stCode").value.trim().toUpperCase();
-  if(!student||!phone||!eid||!code) return alert("All fields required");
-  const ex=await getDoc(doc(db,"exams",eid)); if(!ex.exists()) return alert("Invalid Exam ID"); EXAM=ex.data();
-  if(EXAM.startTime && now()<new Date(EXAM.startTime)) return alert("Exam not started yet");
-  if(EXAM.endTime && now()>new Date(EXAM.endTime)) return alert("Exam time is over");
-  const cd=await getDoc(doc(db,"exams",eid,"codes",code)); if(!cd.exists()) return alert("Invalid code"); if(cd.data().used) return alert("Code already used");
-  if(!EXAM.questions || !EXAM.questions.length) return alert("No questions found");
-  Q=JSON.parse(JSON.stringify(EXAM.questions)).map((q,qi)=>({originalIndex:qi,q:q.q,subject:q.subject,o:q.o.map((x,i)=>({text:x,correct:i===q.a}))}));
-  shuf(Q); Q.forEach(q=>shuf(q.o));
-  ans=Array(Q.length).fill(null); rev=Array(Q.length).fill(false);
-  const perQ=Number(EXAM.sec)||45; const normalSec=Q.length*perQ;
-  const endLeft=EXAM.endTime ? Math.max(1, Math.floor((new Date(EXAM.endTime)-now())/1000)) : normalSec;
-  sec=Math.min(normalSec,endLeft); totalSec=sec;
-  $("examTitle").textContent=EXAM.title||eid; $("login").classList.add("hide"); $("exam").classList.remove("hide"); started=true; show(); tick();
-  timer=setInterval(()=>{ sec--; tick(); if(sec<=0) submit(true); },1000);
-  } catch(e) { alert("Start exam failed: "+e.message); } finally { $("startBtn").disabled=false; }
-});
-
-function show(){
-  const q=Q[cur]; let h=`<div class="q">${q.q}</div>`;
-  q.o.forEach((o,i)=>{ h+=`<label class="opt"><input type="radio" name="op" ${ans[cur]===i?"checked":""} onchange="window.selectOption(${i})"> ${String.fromCharCode(65+i)}) ${o.text}</label>`; });
-  $("qcard").innerHTML=h; $("prog").textContent=`Question ${cur+1} of ${Q.length}`; palette();
-}
-window.selectOption=(i)=>{ ans[cur]=i; palette(); };
-$("nextBtn").addEventListener("click",()=>{ if(cur<Q.length-1){ cur++; show(); } });
-$("prevBtn").addEventListener("click",()=>{ if(cur>0){ cur--; show(); } });
-$("markBtn").addEventListener("click",()=>{ rev[cur]=!rev[cur]; palette(); });
-$("submitBtn").addEventListener("click",()=>submit(false));
-
-function palette(){ let h=""; for(let i=0;i<Q.length;i++){ h+=`<div class="num ${ans[i]!==null?"ans ":""}${rev[i]?"rev ":""}${i===cur?"cur":""}" onclick="window.gotoQ(${i})">${i+1}</div>`; } $("palette").innerHTML=h; }
-window.gotoQ=(i)=>{ cur=i; show(); };
-
-async function submit(auto){
-  if(submitted) return;
-  if(!auto && !confirm("Submit exam?")) return;
-  submitted=true;
-  $("submitBtn").disabled=true; $("submitBtn").textContent="Submitting...";
-  if(timer) clearInterval(timer);
-  try{
-    let correct=0,wrong=0,attempted=0; const details=[];
-    Q.forEach((q,i)=>{ const selected=ans[i]!==null?q.o[ans[i]]:null; const corr=q.o.find(x=>x.correct); if(selected){ attempted++; if(selected.correct) correct++; else wrong++; } details.push({originalIndex:q.originalIndex,question:q.q,selectedText:selected?selected.text:"",correctText:corr?corr.text:"",isCorrect:!!(selected&&selected.correct)}); });
-    const score=correct*(Number(EXAM.marks)||1), total=Q.length*(Number(EXAM.marks)||1), pct=Math.round((score/total)*10000)/100+"%";
-    await setDoc(doc(db,"exams",eid,"attempts",code),{name:student,phone,code,score,total,pct,correct,wrong,attempted,timeTakenSec:totalSec-sec,answerDetails:details,submittedAt:serverTimestamp()});
-    await setDoc(doc(db,"exams",eid,"codes",code),{used:true,studentName:student,phone,usedAt:serverTimestamp()},{merge:true});
-    $("exam").classList.add("hide"); $("result").classList.remove("hide"); $("result").innerHTML=`<h2>Submitted Successfully</h2><p>Score: <b>${score}/${total}</b><br>Correct: ${correct} | Wrong: ${wrong} | Skipped: ${skipped}<br>Negative Deducted: ${negativeDeducted}</p><p>Percentage: <b>${pct}</b></p>`;
-  }catch(e){
-    submitted=false; $("submitBtn").disabled=false; $("submitBtn").textContent="Submit"; alert("Submit failed: "+e.message);
-  }
-}
-
-
-
-$("hallBtn").addEventListener("click", async()=>{
-  const name = $("stName").value.trim() || "Student";
-  const ph = $("stPhone").value.trim() || "-";
-  const photoUrl = ($("stPhoto") ? $("stPhoto").value.trim() : "") || "";
-  const exId = $("stExamId").value.trim().toUpperCase() || "-";
-  const exCode = $("stCode").value.trim().toUpperCase() || "-";
-  let examTitle = "-";
-  let startText = "-";
-  let endText = "-";
-  let durationText = "-";
-  try {
-    if (exId !== "-") {
-      const exSnap = await getDoc(doc(db,"exams",exId));
-      if (exSnap.exists()) {
-        const e = exSnap.data();
-        examTitle = e.title || exId;
-        if (e.startTime) startText = new Date(e.startTime).toLocaleString();
-        if (e.endTime) endText = new Date(e.endTime).toLocaleString();
-        if (e.startTime && e.endTime) {
-          const mins = Math.max(0, Math.round((new Date(e.endTime)-new Date(e.startTime))/60000));
-          durationText = mins + " minutes";
-        } else if (e.sec && e.questions) {
-          durationText = Math.round((Number(e.sec) * (e.questions.length || 0))/60) + " minutes";
-        }
-      }
-    }
-  } catch(e) {}
-  const verifyId = "KSR-VFY-" + exId + "-" + (ph.replace(/\D/g,"").slice(-4) || "0000") + "-" + Date.now().toString().slice(-6);
-  const hallNo = "KSR-" + exId + "-" + (ph.replace(/\D/g,"").slice(-4) || "0000") + "-" + Date.now().toString().slice(-5);
-  const verifyText = `KSR Hall Ticket Verification%0AStudent: ${encodeURIComponent(name)}%0APhone: ${encodeURIComponent(ph)}%0AExam: ${encodeURIComponent(exId)}%0ACode: ${encodeURIComponent(exCode)}%0AVerify ID: ${encodeURIComponent(verifyId)}`;
-  const qrUrl = "https://api.qrserver.com/v1/create-qr-code/?size=170x170&data=" + verifyText;
-  const photoHtml = photoUrl ? `<img src="${photoUrl}" style="width:110px;height:130px;object-fit:cover;border-radius:10px;border:2px solid #0b57d0">` : `<div style="width:110px;height:130px;border:2px dashed #999;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900;color:#777">PHOTO</div>`;
-  const w = window.open("", "_blank");
-  w.document.write(`<!DOCTYPE html><html><head><title>Hall Ticket</title><meta name="viewport" content="width=device-width,initial-scale=1"><style>
-  body{font-family:Arial,sans-serif;background:#eef2f7;margin:0;padding:16px;color:#111}
-  .ticket{max-width:820px;margin:20px auto;background:#fff;border:2px solid #0b57d0;border-radius:18px;overflow:hidden}
-  .head{background:linear-gradient(135deg,#0b57d0,#071a3d);color:white;text-align:center;padding:20px}
-  .head h1{margin:0;font-size:30px}.head p{margin:7px 0 0;font-weight:700}
-  .body{padding:22px}.toprow{display:flex;justify-content:space-between;gap:14px;align-items:center;margin-bottom:16px}
-  .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-  .box{border:1px solid #d1d5db;border-radius:12px;padding:12px;background:#f8fafc}
-  .label{font-size:11px;color:#555;font-weight:900;text-transform:uppercase}.value{font-size:18px;font-weight:900;margin-top:5px}
-  .qr{text-align:center}.inst{margin-top:18px;padding:14px;border-left:6px solid #fbbc04;background:#fff8db;border-radius:12px;line-height:1.6}
-  .foot{display:flex;justify-content:space-between;margin-top:22px;border-top:1px dashed #aaa;padding-top:18px}
-  .actions{text-align:center;margin:20px}.btn{border:0;border-radius:12px;padding:12px 18px;font-weight:900;background:#0b57d0;color:white}
-  @media print{body{background:white}.actions{display:none}.ticket{margin:0;max-width:100%;border-radius:0}}
-  @media(max-width:700px){.grid{grid-template-columns:1fr}.toprow{flex-direction:column}.head h1{font-size:24px}}
-  </style></head><body>
-  <div class="ticket">
-    <div class="head"><h1>KSR Online Exam Platform</h1><p>Professional Hall Ticket with QR Verification</p></div>
-    <div class="body">
-      <div class="toprow">
-        <div>${photoHtml}</div>
-        <div class="qr"><img src="${qrUrl}" width="145" height="145"><br><b>Scan to Verify</b></div>
-      </div>
-      <div class="grid">
-        <div class="box"><div class="label">Hall Ticket No</div><div class="value">${hallNo}</div></div>
-        <div class="box"><div class="label">Verification ID</div><div class="value">${verifyId}</div></div>
-        <div class="box"><div class="label">Student Name</div><div class="value">${name}</div></div>
-        <div class="box"><div class="label">Phone</div><div class="value">${ph}</div></div>
-        <div class="box"><div class="label">Exam Title</div><div class="value">${examTitle}</div></div>
-        <div class="box"><div class="label">Exam ID</div><div class="value">${exId}</div></div>
-        <div class="box"><div class="label">Exam Code</div><div class="value">${exCode}</div></div>
-        <div class="box"><div class="label">Status</div><div class="value">Eligible</div></div>
-        <div class="box"><div class="label">Start Time</div><div class="value">${startText}</div></div>
-        <div class="box"><div class="label">End Time</div><div class="value">${endText}</div></div>
-        <div class="box"><div class="label">Duration</div><div class="value">${durationText}</div></div>
-        <div class="box"><div class="label">Generated On</div><div class="value">${new Date().toLocaleString()}</div></div>
-      </div>
-      <div class="inst"><b>Instructions:</b><br>1. Carry this hall ticket during exam.<br>2. Exam ID and Code must match exactly.<br>3. Do not refresh/close browser during exam.<br>4. Time ends means auto submit will happen.</div>
-      <div class="foot"><div>Student Signature</div><div>Invigilator Signature</div></div>
-    </div>
-  </div>
-  <div class="actions"><button class="btn" onclick="window.print()">Print / Save PDF</button></div>
-  </body></html>`);
-  w.document.close();
-});
-
-window.addEventListener("beforeunload",(e)=>{ if(started&&!submitted){ e.preventDefault(); e.returnValue="Exam running"; } });
+const $=id=>document.getElementById(id);
+let EXAM=null,Q=[],cur=0,ans=[],rev=[],sec=0,timer=null,student="",phone="",eid="",code="",submitted=false,startMs=0,started=false;
+function shuf(a){for(let i=a.length-1;i>0;i--){let j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function tick(){let m=Math.floor(sec/60),s=sec%60;$("timer").textContent=String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")}
+function msg(t,b=false){$("loginMsg").innerHTML=b?`<span class="bad">${t}</span>`:`<span class="ok">${t}</span>`}
+document.addEventListener("DOMContentLoaded",()=>{$("startBtn").onclick=startExam;$("hallBtn").onclick=hallTicket;$("nextBtn").onclick=()=>{if(cur<Q.length-1){cur++;show()}};$("prevBtn").onclick=()=>{if(cur>0){cur--;show()}};$("markBtn").onclick=()=>{rev[cur]=!rev[cur];palette()};$("submitBtn").onclick=()=>submit(false)});
+async function startExam(){try{student=$("stName").value.trim();phone=$("stPhone").value.trim();eid=$("stExamId").value.trim().toUpperCase();code=$("stCode").value.trim().toUpperCase();if(!student||!phone||!eid||!code)return msg("All fields required",true);const ex=await getDoc(doc(db,"exams",eid));if(!ex.exists())return msg("Invalid Exam ID",true);EXAM=ex.data();let n=new Date();if(EXAM.startTime&&n<new Date(EXAM.startTime))return msg("Exam not started yet",true);if(EXAM.endTime&&n>new Date(EXAM.endTime))return msg("Exam time is over",true);const cd=await getDoc(doc(db,"exams",eid,"codes",code));if(!cd.exists())return msg("Invalid code",true);if(cd.data().used)return msg("Code already used",true);if(!EXAM.questions?.length)return msg("No questions found",true);await setDoc(doc(db,"students",phone),{name:student,phone,updatedAt:serverTimestamp()},{merge:true});Q=JSON.parse(JSON.stringify(EXAM.questions)).map((q,qi)=>({originalIndex:qi,q:q.q,subject:q.subject,o:(q.o||[]).map((x,i)=>({text:x,correct:i===Number(q.a)}))}));shuf(Q);Q.forEach(q=>shuf(q.o));ans=Array(Q.length).fill(null);rev=Array(Q.length).fill(false);let normal=Q.length*(Number(EXAM.sec)||45),left=EXAM.endTime?Math.max(1,Math.floor((new Date(EXAM.endTime)-n)/1000)):normal;sec=Math.min(normal,left);startMs=Date.now();$("examTitle").textContent=EXAM.title||eid;$("login").classList.add("hide");$("exam").classList.remove("hide");started=true;show();tick();timer=setInterval(()=>{sec--;tick();if(sec<=0)submit(true)},1000)}catch(e){alert("Start failed: "+e.message)}}
+function show(){let q=Q[cur],h=`<div class="q">${cur+1}. ${q.q}</div>`;q.o.forEach((o,i)=>h+=`<label class="opt"><input type="radio" name="op" ${ans[cur]===i?"checked":""} onchange="window.selectOption(${i})"> ${String.fromCharCode(65+i)}) ${o.text}</label>`);$("qcard").innerHTML=h;$("prog").textContent=`Question ${cur+1} of ${Q.length}`;palette()}
+window.selectOption=i=>{ans[cur]=i;palette()};window.gotoQ=i=>{cur=i;show()};
+function palette(){let h="";for(let i=0;i<Q.length;i++)h+=`<div class="num ${ans[i]!==null?"ans ":""}${rev[i]?"rev ":""}${i===cur?"cur":""}" onclick="window.gotoQ(${i})">${i+1}</div>`;$("palette").innerHTML=h}
+async function submit(auto){if(submitted)return;if(!auto&&!confirm("Submit exam?"))return;submitted=true;if(timer)clearInterval(timer);try{let correct=0,wrong=0,skipped=0,details=[];Q.forEach((q,i)=>{let selected=ans[i]!==null?q.o[ans[i]]:null,corr=q.o.find(x=>x.correct),status="skipped";if(!selected)skipped++;else if(selected.correct){correct++;status="correct"}else{wrong++;status="wrong"}details.push({question:q.q,selectedText:selected?selected.text:"",correctText:corr?corr.text:"",isCorrect:status==="correct",status})});let marks=Number(EXAM.marks)||1,neg=EXAM.negativeOn?(Number(EXAM.negativeMark)||0):0,total=Q.length*marks,negativeDeducted=wrong*neg,score=correct*marks-negativeDeducted;if(score<0)score=0;let pct=total?Math.round((score/total)*10000)/100:0;await setDoc(doc(db,"exams",eid,"attempts",code),{name:student,phone,code,score,total,pct:pct+"%",correct,wrong,skipped,negativeDeducted,timeTakenSec:Math.floor((Date.now()-startMs)/1000),answerDetails:details,submittedAt:serverTimestamp()});await setDoc(doc(db,"exams",eid,"codes",code),{used:true,studentName:student,phone,usedAt:serverTimestamp()},{merge:true});$("exam").classList.add("hide");$("result").classList.remove("hide");$("result").innerHTML=`<h2>Submitted Successfully</h2><p>Score: <b>${score}/${total}</b></p><p>Percentage: <b>${pct}%</b></p><p>Correct: ${correct} | Wrong: ${wrong} | Skipped: ${skipped}</p><p>Negative Deducted: ${negativeDeducted}</p>`+details.map((r,i)=>`<div class="review-card ${r.status}"><b>Q${i+1}. ${r.question}</b><br>Your: ${r.selectedText||"Skipped"}<br>Correct: ${r.correctText}</div>`).join("")}catch(e){submitted=false;alert("Submit failed: "+e.message)}}
+async function hallTicket(){let name=$("stName").value.trim()||"Student",ph=$("stPhone").value.trim()||"-",photo=$("stPhoto").value.trim(),exId=$("stExamId").value.trim().toUpperCase()||"-",exCode=$("stCode").value.trim().toUpperCase()||"-",title="-",st="-",en="-",dur="-";try{let ex=await getDoc(doc(db,"exams",exId));if(ex.exists()){let e=ex.data();title=e.title||exId;if(e.startTime)st=new Date(e.startTime).toLocaleString();if(e.endTime)en=new Date(e.endTime).toLocaleString();if(e.startTime&&e.endTime)dur=Math.round((new Date(e.endTime)-new Date(e.startTime))/60000)+" minutes"}}catch(e){}let vid="KSR-VFY-"+exId+"-"+(ph.replace(/\D/g,"").slice(-4)||"0000")+"-"+Date.now().toString().slice(-6),hall="KSR-"+exId+"-"+(ph.replace(/\D/g,"").slice(-4)||"0000")+"-"+Date.now().toString().slice(-5),qr="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data="+encodeURIComponent(`KSR Hall Ticket\nName:${name}\nPhone:${ph}\nExam:${exId}\nCode:${exCode}\nVerify:${vid}`),photoHtml=photo?`<img src="${photo}" style="width:110px;height:130px;object-fit:cover;border:2px solid #0b57d0;border-radius:10px">`:`<div style="width:110px;height:130px;border:2px dashed #999;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900">PHOTO</div>`;let w=open("","_blank");w.document.write(`<!DOCTYPE html><html><head><title>Hall Ticket</title><style>body{font-family:Arial;background:#eef2f7}.t{max-width:820px;margin:20px auto;background:white;border:2px solid #0b57d0;border-radius:18px;overflow:hidden}.h{background:#0b57d0;color:white;text-align:center;padding:20px}.b{padding:22px}.top{display:flex;justify-content:space-between}.g{display:grid;grid-template-columns:1fr 1fr;gap:12px}.box{border:1px solid #ddd;border-radius:12px;padding:12px}.l{font-size:11px;font-weight:900;color:#555}.v{font-size:18px;font-weight:900}@media print{button{display:none}}</style></head><body><div class="t"><div class="h"><h1>KSR Online Exam Platform</h1><p>Hall Ticket QR</p></div><div class="b"><div class="top">${photoHtml}<div><img src="${qr}"><br><b>Scan to Verify</b></div></div><div class="g">${[['Hall Ticket No',hall],['Verification ID',vid],['Student Name',name],['Phone',ph],['Exam Title',title],['Exam ID',exId],['Exam Code',exCode],['Start Time',st],['End Time',en],['Duration',dur],['Status','Eligible']].map(x=>`<div class="box"><div class="l">${x[0]}</div><div class="v">${x[1]}</div></div>`).join("")}</div><p><b>Instructions:</b><br>1. Carry hall ticket.<br>2. Do not refresh during exam.<br>3. Submit before time ends.</p><br><br>Student Signature __________________ &nbsp;&nbsp; Invigilator Signature __________________</div></div><center><button onclick="print()">Print / Save PDF</button></center></body></html>`);w.document.close()}
+window.addEventListener("beforeunload",e=>{if(started&&!submitted){e.preventDefault();e.returnValue="Exam running"}});
