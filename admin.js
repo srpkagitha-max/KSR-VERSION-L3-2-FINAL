@@ -158,3 +158,54 @@ async function checkDbHealth(){
     alert("Firebase DB Error: "+e.message);
   }
 }
+
+
+async function importPdfQuestions(){
+  const fileEl = $("pdfFile");
+  const msgEl = $("pdfImportMsg");
+  try{
+    if(!fileEl || !fileEl.files || !fileEl.files[0]) return alert("Please select PDF file");
+    if(msgEl) msgEl.innerHTML = '<span class="pdf-warn">Reading PDF...</span>';
+    const mod = await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs");
+    mod.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
+    const data = await fileEl.files[0].arrayBuffer();
+    const pdf = await mod.getDocument({data}).promise;
+    let text = "";
+    for(let i=1;i<=pdf.numPages;i++){
+      const page = await pdf.getPage(i);
+      const content = await page.getTextContent();
+      text += content.items.map(x=>x.str).join(" ") + "\n";
+    }
+    const formatted = normalizePdfQuestions(text);
+    $("bits").value = formatted || text;
+    if(msgEl) msgEl.innerHTML = `<span class="pdf-ok">Imported ${pdf.numPages} page(s). Review and Save Exam.</span>`;
+    alert("PDF imported. Please review before saving.");
+  }catch(e){
+    if(msgEl) msgEl.innerHTML = `<span class="pdf-bad">PDF import failed: ${e.message}</span>`;
+    alert("PDF import failed: "+e.message);
+  }
+}
+function normalizePdfQuestions(text){
+  let t = String(text||"")
+    .replace(/\r/g,"\n")
+    .replace(/[ \t]+/g," ")
+    .replace(/(\d+[\.\)])\s*/g,"\n$1 ")
+    .replace(/\s+([A-Da-d])[\.\)]\s*/g,"\n$1. ")
+    .replace(/\s+(Answer|Ans|సమాధానం)\s*[:：]\s*([A-Da-d])/gi,"\nAnswer: $2\n")
+    .replace(/\n{2,}/g,"\n").trim();
+  const lines=t.split("\n").map(x=>x.trim()).filter(Boolean), out=[];
+  let n=0;
+  for(const line of lines){
+    if(/^\d+[\.\)]/.test(line)){n++; out.push(line.replace(/^(\d+)[\.\)]\s*/, n+". "));}
+    else if(/^[A-Da-d][\.\)]/.test(line)){out.push(line.replace(/^([A-Da-d])[\.\)]\s*/, (m,p)=>p.toUpperCase()+". "));}
+    else if(/^(Answer|Ans|సమాధానం)\s*[:：]/i.test(line)){out.push(line.replace(/^(Answer|Ans|సమాధానం)\s*[:：]\s*/i,"Answer: "));}
+    else if(out.length && !/^[A-D]\./.test(out[out.length-1]) && !/^Answer:/i.test(out[out.length-1])) out[out.length-1]+=" "+line;
+    else out.push(line);
+  }
+  return out.join("\n");
+}
+
+// PDF_IMPORT_BIND_L35
+document.addEventListener("click", function(e){
+  if(e.target && e.target.id === "importPdfBtn") importPdfQuestions();
+});
