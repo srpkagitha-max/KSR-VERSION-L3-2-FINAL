@@ -1,30 +1,138 @@
 import { auth, db } from './firebase-config.js';
 import { signInWithEmailAndPassword, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-auth.js';
-import { doc, setDoc, getDocs, collection, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
-const $=id=>document.getElementById(id);let lastRows=[];
-onAuthStateChanged(auth,user=>{if(user){$("loginCard").classList.add("hide");$("app").classList.remove("hide")}else{$("loginCard").classList.remove("hide");$("app").classList.add("hide")}});
-$("loginBtn").onclick=async()=>{const email=$("email").value.trim(),pass=$("pass").value.trim();if(!email||!pass)return alert("Email and password required");try{await signInWithEmailAndPassword(auth,email,pass)}catch(e){$("loginMsg").textContent="Login failed: "+e.message}};
-$("logoutBtn").onclick=()=>signOut(auth);
-document.querySelectorAll(".tab").forEach(btn=>btn.onclick=()=>{document.querySelectorAll(".tab").forEach(b=>b.classList.remove("active"));btn.classList.add("active");document.querySelectorAll(".view").forEach(v=>v.classList.add("hide"));$("view-"+btn.dataset.view).classList.remove("hide")});
-function parseQuestions(text){const blocks=text.split(/\n\s*\n/).map(x=>x.trim()).filter(Boolean),questions=[];blocks.forEach(block=>{const lines=block.split("\n").map(x=>x.trim()).filter(Boolean);if(lines.length<6)return;let q=lines[0].replace(/^\d+[\).\s-]*/,"").trim(),opts=[],ansLetter="A";lines.slice(1).forEach(line=>{const m=line.match(/^([A-Da-d])[\).\s-]+(.+)/);if(m)opts.push(m[2].trim());const a=line.match(/answer\s*[:\-]\s*([A-Da-d])/i);if(a)ansLetter=a[1].toUpperCase()});if(opts.length>=4)questions.push({q,o:opts.slice(0,4),a:"ABCD".indexOf(ansLetter)})});return questions}
-function makeCode(){const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let c="";for(let i=0;i<6;i++)c+=chars[Math.floor(Math.random()*chars.length)];return c}
-function csvDownload(rows,name){if(!rows.length)return alert("No data");const headers=Object.keys(rows[0]);const csv=[headers.join(",")].concat(rows.map(r=>headers.map(h=>`"${String(r[h]??"").replace(/"/g,'""')}"`).join(","))).join("\n");const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));a.download=name;a.click()}
-$("saveExamBtn").onclick=async()=>{
- const examId=$("examId").value.trim().toUpperCase(),title=$("examTitle").value.trim();
- const startTime=$("startTime").value?new Date($("startTime").value).toISOString():"";
- const endTime=$("endTime").value?new Date($("endTime").value).toISOString():"";
- const sec=Number($("sec").value)||45,marks=Number($("marks").value)||1,count=Number($("count").value)||20,questions=parseQuestions($("bits").value);
- if(!examId||!title)return alert("Exam ID and title required");
- if(startTime&&endTime&&new Date(endTime)<=new Date(startTime))return alert("End Time must be after Start Time");
- if(!questions.length)return alert("Questions format wrong. Use Answer: A/B/C/D and blank line between questions.");
- try{
-  await setDoc(doc(db,"exams",examId),{title,startTime,endTime,sec,marks,questions,updatedAt:serverTimestamp()});
-  const codes=[];for(let i=0;i<count;i++){const code=makeCode();codes.push(code);await setDoc(doc(db,"exams",examId,"codes",code),{used:false,createdAt:serverTimestamp()})}
-  $("codesBox").textContent="Exam Saved ✅\n\nStart: "+(startTime||"Any time")+"\nEnd: "+(endTime||"No end time")+"\n\nCodes:\n"+codes.join("\n")
- }catch(e){alert("Save failed: "+e.message)}
-};
-$("loadExamsBtn").onclick=async()=>{try{const snap=await getDocs(collection(db,"exams"));let rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));if(!rows.length){$("examsBox").innerHTML="<p>No exams found.</p>";return}let html='<table class="adminTable"><tr><th>Exam ID</th><th>Title</th><th>Start</th><th>End</th><th>Questions</th><th>Sec/Q</th><th>Marks</th></tr>';rows.forEach(r=>html+=`<tr><td>${r.id}</td><td>${r.title||""}</td><td>${r.startTime?new Date(r.startTime).toLocaleString():"-"}</td><td>${r.endTime?new Date(r.endTime).toLocaleString():"-"}</td><td>${(r.questions||[]).length}</td><td>${r.sec||""}</td><td>${r.marks||""}</td></tr>`);html+="</table>";$("examsBox").innerHTML=html}catch(e){alert("Load exams failed: "+e.message)}};
-async function loadAttempts(examId,target){const snap=await getDocs(collection(db,"exams",examId,"attempts"));const rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));rows.sort((a,b)=>(b.score||0)-(a.score||0));lastRows=rows;if(!rows.length){$(target).innerHTML="<p>No results found.</p>";return rows}let html='<table class="adminTable"><tr><th>Rank</th><th>Name</th><th>Phone</th><th>Code</th><th>Score</th><th>%</th><th>Correct</th><th>Wrong</th><th>Attempted</th></tr>';rows.forEach((r,i)=>html+=`<tr><td>${i+1}</td><td>${r.name||""}</td><td>${r.phone||""}</td><td>${r.code||r.id}</td><td>${r.score||0}/${r.total||0}</td><td>${r.pct||""}</td><td>${r.correct||0}</td><td>${r.wrong||0}</td><td>${r.attempted||0}</td></tr>`);html+="</table>";$(target).innerHTML=html;return rows}
-$("loadStudentsBtn").onclick=async()=>{const id=$("studentsExamId").value.trim().toUpperCase();if(!id)return alert("Enter Exam ID");try{await loadAttempts(id,"studentsBox")}catch(e){alert("Load students failed: "+e.message)}};
-$("loadResultsBtn").onclick=async()=>{const id=$("reportExamId").value.trim().toUpperCase();if(!id)return alert("Enter Exam ID");try{const rows=await loadAttempts(id,"resultsBox");if(rows.length){const avg=Math.round(rows.reduce((s,r)=>s+(r.score||0),0)/rows.length*100)/100;$("rankStatsBox").innerHTML=`<div class="stat">Attempts<br>${rows.length}</div><div class="stat">Top Score<br>${rows[0].score||0}</div><div class="stat">Average<br>${avg}</div><div class="stat">Topper<br>${rows[0].name||"-"}</div>`}}catch(e){alert("Load results failed: "+e.message)}};
-$("exportStudentsBtn").onclick=()=>csvDownload(lastRows,"students.csv");$("exportResultsBtn").onclick=()=>csvDownload(lastRows,"results.csv");
+import { doc,setDoc,getDoc,collection,getDocs,serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.4/firebase-firestore.js';
+
+const $ = id => document.getElementById(id);
+let resultsCache=[], currentQuestions=[], currentExamId="";
+
+function msg(t,b=false){ if($("loginMsg")) $("loginMsg").innerHTML=b?`<span class="bad">${t}</span>`:`<span class="ok">${t}</span>`; }
+function safe(v){ return String(v||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,""); }
+function csvDownload(text,name){ const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([text],{type:"text/csv;charset=utf-8"})); a.download=name; a.click(); }
+function formatTime(sec){ sec=Number(sec)||0; return String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0"); }
+
+window.addEventListener("error", e => alert("Admin JS error: "+e.message));
+
+document.addEventListener("DOMContentLoaded",()=>{
+  const lb=$("loginBtn");
+  if(lb){
+    lb.onclick=async()=>{
+      try{
+        lb.disabled=true; lb.textContent="Checking..."; msg("Logging in...");
+        const email=$("email").value.trim(), pass=$("pass").value;
+        if(!email||!pass) throw new Error("Email and Password required");
+        await signInWithEmailAndPassword(auth,email,pass);
+        msg("Login success");
+      }catch(e){ msg(e.message,true); alert(e.message); }
+      finally{ lb.disabled=false; lb.textContent="Login"; }
+    };
+  }
+  if($("logoutBtn")) $("logoutBtn").onclick=()=>signOut(auth);
+  document.querySelectorAll(".sidebtn").forEach(b=>b.onclick=()=>{
+    document.querySelectorAll(".sidebtn").forEach(x=>x.classList.remove("active"));
+    b.classList.add("active");
+    document.querySelectorAll(".view").forEach(v=>v.classList.add("hide"));
+    const v=$("view-"+b.dataset.view); if(v) v.classList.remove("hide");
+  });
+  bind("darkBtn",()=>document.body.classList.toggle("dark"));
+  bind("saveInstituteBtn",saveInstitute); bind("loadInstitutesBtn",loadInstitutes);
+  bind("saveExamBtn",saveExam); bind("loadExamsBtn",loadExams);
+  bind("loadQuestionsBtn",loadQuestions); bind("loadStudentsBtn",loadStudents);
+  bind("exportStudentsBtn",exportStudents); bind("loadResultsBtn",()=>loadResults(safe($("reportExamId").value)));
+  bind("exportResultsBtn",exportResults); bind("loadStatsBtn",loadStats);
+});
+function bind(id,fn){ const e=$(id); if(e) e.onclick=fn; }
+
+onAuthStateChanged(auth,u=>{
+  if($("loginCard")) $("loginCard").classList.toggle("hide",!!u);
+  if($("app")) $("app").classList.toggle("hide",!u);
+});
+
+async function saveInstitute(){
+  try{
+    const id=safe($("instId").value);
+    if(!id||!$("instName").value.trim()) return alert("Institute ID + Name required");
+    const data={name:$("instName").value.trim(),adminEmail:$("instEmail").value.trim(),contact:$("instContact").value.trim(),plan:$("instPlan").value,status:$("instStatus").value,themeColor:$("instTheme").value,updatedAt:serverTimestamp()};
+    await setDoc(doc(db,"institutes",id),data,{merge:true});
+    alert("Institute saved"); loadInstitutes();
+  }catch(e){ alert("Save institute failed: "+e.message); }
+}
+async function loadInstitutes(){
+  const s=await getDocs(collection(db,"institutes")); let h="";
+  s.forEach(d=>{ const x=d.data(); h+=`<div class="inst-card"><b>${x.name||""}</b> <span class="pill">${d.id}</span><br>${x.status||""} | ${x.plan||""}</div>`; });
+  $("institutesBox").innerHTML=h||"No institutes";
+}
+
+function optLine(line){ const m=line.match(/^([A-Da-d])[\.)]\s*(.*)$/); return m?{idx:"ABCD".indexOf(m[1].toUpperCase()),txt:m[2]}:null; }
+function parseBits(raw){
+  const qs=[]; let cur=null, subject="General";
+  const flush=()=>{ if(cur&&cur.o.length===4){ if(cur.a===null)cur.a=0; qs.push(cur);} cur=null; };
+  raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(line=>{
+    if(line.startsWith("*")&&line.endsWith("*")){subject=line.replace(/\*/g,"");return;}
+    const o=optLine(line);
+    if(o&&cur){ if(/[●⚫•*]/.test(o.txt)) cur.a=o.idx; cur.o.push(o.txt.replace(/[●⚫•*]/g,"").trim()); return; }
+    if(/^\d+[\.)]/.test(line)){ flush(); cur={subject,q:line.replace(/^\d+[\.)]\s*/,""),o:[],a:null}; return; }
+    if(cur) cur.q+="\n"+line;
+  });
+  flush(); return qs;
+}
+function genCodes(n){ const a=[]; while(a.length<n){ const c="KSR"+Math.floor(100000+Math.random()*900000); if(!a.includes(c)) a.push(c); } return a; }
+async function saveExam(){
+  try{
+    const id=safe($("examId").value); let qs=parseBits($("bits").value);
+    const old=await getDoc(doc(db,"exams",id)); if(!qs.length&&old.exists()) qs=old.data().questions||[];
+    if(!id||!qs.length) return alert("Exam ID + Questions required");
+    const st=$("startTime").value?new Date($("startTime").value).toISOString():"";
+    const en=$("endTime").value?new Date($("endTime").value).toISOString():"";
+    await setDoc(doc(db,"exams",id),{title:$("examTitle").value||id,questions:qs,startTime:st,endTime:en,passMark:Number($("passMark").value)||35,sec:Number($("sec").value)||45,marks:Number($("marks").value)||1,updatedAt:serverTimestamp(),negativeOn:($("negativeOn")&&$("negativeOn").value==="on"),negativeMark:Number(($("negativeMark")&&$("negativeMark").value)||0),version:"L3.3-NEGATIVE"},{merge:true});
+    const codes=genCodes(Number($("count").value)||50);
+    for(const c of codes) await setDoc(doc(db,"exams",id,"codes",c),{code:c,used:false,active:true,createdAt:serverTimestamp()});
+    $("codesBox").textContent=codes.join("\n"); alert("Exam saved");
+  }catch(e){ alert("Save exam failed: "+e.message); }
+}
+async function loadExams(){
+  const s=await getDocs(collection(db,"exams")); let h="";
+  s.forEach(d=>{ const x=d.data(); h+=`<div class="exam-card"><b>${d.id}</b> ${x.title||""}<br>Qs: ${(x.questions||[]).length}<br><button class="g" onclick="window.openResults('${d.id}')">Results</button></div>`;});
+  $("examsBox").innerHTML=h||"No exams";
+}
+async function loadQuestions(){
+  currentExamId=safe($("qeExamId").value);
+  const d=await getDoc(doc(db,"exams",currentExamId)); if(!d.exists()) return alert("Exam not found");
+  currentQuestions=d.data().questions||[]; $("questionsBox").innerHTML=`<pre>${JSON.stringify(currentQuestions,null,2)}</pre>`;
+}
+async function loadStudents(){
+  const s=await getDocs(collection(db,"students")); let h="<table><tr><th>Name</th><th>Phone</th><th>Course</th></tr>";
+  s.forEach(d=>{const x=d.data(); h+=`<tr><td>${x.name||""}</td><td>${x.phone||d.id}</td><td>${x.course||""}</td></tr>`;});
+  $("studentsBox").innerHTML=h+"</table>";
+}
+async function exportStudents(){ alert("Students CSV export available after loading students."); }
+
+async function loadResults(id){
+  if(!id) return alert("Enter Exam ID");
+  const ex=await getDoc(doc(db,"exams",id)); const passMark=ex.exists()?(Number(ex.data().passMark)||35):35;
+  const s=await getDocs(collection(db,"exams",id,"attempts")); resultsCache=[];
+  s.forEach(d=>resultsCache.push({attemptId:d.id,...d.data()}));
+  resultsCache=resultsCache.map(r=>{const total=Number(r.total)||0, score=Number(r.score)||0, pctNum=total?score/total*100:0; return {...r,percentNum:pctNum,passStatus:pctNum>=passMark?"PASS":"FAIL",timeTakenSec:Number(r.timeTakenSec)||0};})
+  .sort((a,b)=>b.score-a.score || b.percentNum-a.percentNum || a.timeTakenSec-b.timeTakenSec);
+  let rank=0, ps=null, pp=null, pt=null;
+  resultsCache=resultsCache.map((r,i)=>{ if(r.score!==ps||r.percentNum!==pp||r.timeTakenSec!==pt){rank=i+1;ps=r.score;pp=r.percentNum;pt=r.timeTakenSec;} return {...r,rank};});
+  const total=resultsCache.length, passed=resultsCache.filter(r=>r.passStatus==="PASS").length, failed=total-passed;
+  const highest=total?Math.max(...resultsCache.map(r=>Number(r.score)||0)):0;
+  const avg=total?(resultsCache.reduce((a,r)=>a+(Number(r.score)||0),0)/total).toFixed(2):0;
+  if($("rankStatsBox")) $("rankStatsBox").innerHTML=`<div class="stat"><div class="label">Appeared</div><div class="value">${total}</div></div><div class="stat"><div class="label">Passed</div><div class="value">${passed}</div></div><div class="stat"><div class="label">Failed</div><div class="value">${failed}</div></div><div class="stat"><div class="label">Highest</div><div class="value">${highest}</div></div><div class="stat"><div class="label">Average</div><div class="value">${avg}</div></div>`;
+  let lead=`<div class="leader-card"><div class="leader-title">🏆 Top 10 Leaderboard</div><table><tr><th>Rank</th><th>Name</th><th>Score</th><th>%</th><th>Time</th></tr>`;
+  resultsCache.slice(0,10).forEach(r=>{const m=r.rank===1?"🥇":r.rank===2?"🥈":r.rank===3?"🥉":""; lead+=`<tr><td><span class="rank-badge">${m} ${r.rank}</span></td><td>${r.name||""}</td><td>${r.score||0}/${r.total||0}</td><td>${r.pct||""}</td><td>${formatTime(r.timeTakenSec)}</td></tr>`;});
+  lead+="</table></div>"; if($("leaderBox")) $("leaderBox").innerHTML=lead;
+  let h="<table><tr><th>Rank</th><th>Name</th><th>Phone</th><th>Score</th><th>%</th><th>Correct</th><th>Wrong</th><th>Skipped</th><th>Negative</th><th>Status</th><th>Time</th></tr>";
+  resultsCache.forEach(r=>h+=`<tr><td>${r.rank}</td><td>${r.name||""}</td><td>${r.phone||""}</td><td>${r.score||0}/${r.total||0}</td><td>${r.pct||""}</td><td>${r.correct||0}</td><td>${r.wrong||0}</td><td>${r.skipped||0}</td><td>${r.negativeDeducted||0}</td><td class="${r.passStatus==="PASS"?"pass":"fail"}">${r.passStatus}</td><td>${formatTime(r.timeTakenSec)}</td></tr>`);
+  $("resultsBox").innerHTML=h+"</table>";
+}
+window.openResults=id=>{document.querySelector('[data-view="reports"]').click(); $("reportExamId").value=id; loadResults(id);};
+function exportResults(){
+  const rows=["Rank,Name,Phone,Code,Score,Total,Percent,Correct,Wrong,Skipped,Negative,Status,TimeTaken"];
+  resultsCache.forEach(r=>rows.push(`${r.rank},"${r.name||""}","${r.phone||""}","${r.code||""}",${r.score||0},${r.total||0},"${r.pct||""}",${r.correct||0},${r.wrong||0},${r.skipped||0},${r.negativeDeducted||0},"${r.passStatus||""}","${formatTime(r.timeTakenSec)}"`));
+  csvDownload(rows.join("\n"),"rank_results.csv");
+}
+async function loadStats(){
+  const ex=await getDocs(collection(db,"exams")); const st=await getDocs(collection(db,"students"));
+  $("statsBox").innerHTML=`<div class="stat"><div class="label">Students</div><div class="value">${st.size}</div></div><div class="stat"><div class="label">Exams</div><div class="value">${ex.size}</div></div>`;
+}

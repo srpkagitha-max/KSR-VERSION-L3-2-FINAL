@@ -1,20 +1,58 @@
 <!DOCTYPE html>
 <html lang="te">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR Admin L3.3 Time Final</title><link rel="stylesheet" href="style.css"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR Version L3.3 Production Final - Negative Marks</title><link rel="stylesheet" href="style.css"></head>
 <body>
-<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L3.3 Time Final Admin</div></div><a class="headlink" href="index.html">Student Page</a></div></div>
+<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L3.3 Production Final - Negative Marks</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
 <div class="wrap">
-<div id="loginCard" class="card"><h2>Admin Login</h2><label>Email</label><input id="email" placeholder="admin email"><label>Password</label><input id="pass" type="password" placeholder="password"><button class="p" id="loginBtn">Login</button><p id="loginMsg" class="small"></p></div>
-<div id="app" class="hide">
-<div class="card top"><h2>Admin Dashboard</h2><button class="d" id="logoutBtn">Logout</button></div>
-<div class="tabs card"><button class="tab active" data-view="create">Create Exam</button><button class="tab" data-view="exams">Exams List</button><button class="tab" data-view="students">Students</button><button class="tab" data-view="reports">Reports</button></div>
-<section id="view-create" class="view card"><h2>Create Exam</h2><div class="grid"><div><label>Exam ID</label><input id="examId" value="DSC001"></div><div><label>Exam Title</label><input id="examTitle" value="Mock Test"></div></div><div class="grid"><div><label>Start Time</label><input id="startTime" type="datetime-local"></div><div><label>End Time</label><input id="endTime" type="datetime-local"></div></div><div class="grid"><div><label>Seconds / Question</label><input id="sec" type="number" value="45"></div><div><label>Marks / Question</label><input id="marks" type="number" value="1"></div></div><label>Codes Count</label><input id="count" type="number" value="20"><label>Questions</label><textarea id="bits" placeholder="1. Question text?
-A. Option 1
-B. Option 2
-C. Option 3
-D. Option 4
-Answer: B"></textarea><button class="p" id="saveExamBtn">Save Exam + Generate Codes</button><pre id="codesBox"></pre></section>
-<section id="view-exams" class="view card hide"><h2>Exams List</h2><button class="s" id="loadExamsBtn">Load Exams</button><div id="examsBox"></div></section>
-<section id="view-students" class="view card hide"><h2>Students / Attempts</h2><label>Exam ID</label><input id="studentsExamId" value="DSC001"><button class="s" id="loadStudentsBtn">Load Students</button><button class="o" id="exportStudentsBtn">Export CSV</button><div id="studentsBox"></div></section>
-<section id="view-reports" class="view card hide"><h2>Reports + Rank List</h2><label>Exam ID</label><input id="reportExamId" value="DSC001"><button class="s" id="loadResultsBtn">Load Results</button><button class="o" id="exportResultsBtn">Export CSV</button><div id="rankStatsBox" class="stat-grid"></div><div id="resultsBox"></div></section>
-</div></div><script type="module" src="admin.js?v=l33time"></script></body></html>
+  <div id="loginCard" class="card">
+    <h2>Admin Login</h2>
+    <div class="grid"><div><label>Email</label><input id="email" placeholder="admin email"></div><div><label>Password</label><input id="pass" type="password" placeholder="password"></div></div>
+    <button class="p" id="loginBtn" type="button">Login</button><p id="loginMsg" class="small"></p>
+  </div>
+  <div id="app" class="hide">
+    <div class="card top"><h2>Dashboard <span class="badge">Version L3.3 Production Final - Negative Marks</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
+    <div class="layout">
+      <div class="sidebar">
+        <button class="sidebtn active" data-view="dashboard">📊 Dashboard</button>
+        <button class="sidebtn" data-view="institutes">🏢 Institutes</button>
+        <button class="sidebtn" data-view="exams">📝 Exams</button>
+        <button class="sidebtn" data-view="questions">✏️ Question Editor</button>
+        <button class="sidebtn" data-view="students">👨‍🎓 Students</button>
+        <button class="sidebtn" data-view="reports">📈 Reports</button>
+        <button class="sidebtn" data-view="settings">⚙️ Settings</button>
+      </div>
+      <main>
+        <section id="view-dashboard" class="view card"><h2>📊 Dashboard</h2><button class="g" id="loadStatsBtn">Load Stats</button><div id="statsBox" class="stat-grid"></div></section>
+        <section id="view-institutes" class="view card hide">
+          <h2>🏢 Institute Management</h2>
+          <div class="grid"><div><label>Institute ID</label><input id="instId" placeholder="KSR"></div><div><label>Institute Name</label><input id="instName" placeholder="Institute name"></div></div>
+          <div class="grid"><div><label>Admin Email</label><input id="instEmail"></div><div><label>Contact</label><input id="instContact"></div></div>
+          <div class="grid3"><div><label>Plan</label><select id="instPlan"><option>Free</option><option>Basic</option><option>Premium</option></select></div><div><label>Status</label><select id="instStatus"><option>Active</option><option>Blocked</option></select></div><div><label>Theme</label><input id="instTheme" type="color" value="#0b57d0"></div></div>
+          <button class="p" id="saveInstituteBtn">Save Institute</button><button class="g" id="loadInstitutesBtn">Load Institutes</button><div id="institutesBox"></div>
+        </section>
+        <section id="view-exams" class="view card hide">
+          <h2>📝 Exam Management</h2>
+          <div class="grid"><div><label>Exam ID</label><input id="examId" value="DSC001"></div><div><label>Exam Title</label><input id="examTitle" value="Mock Test"></div></div>
+          <div class="grid"><div><label>Start Time</label><input id="startTime" type="datetime-local"></div><div><label>End Time</label><input id="endTime" type="datetime-local"></div></div>
+          <div class="grid3"><div><label>Institute ID</label><input id="examInstituteId"></div><div><label>Category</label><input id="examCategory" value="DSC"></div><div><label>Pass %</label><input id="passMark" type="number" value="35"></div></div>
+          <div class="grid3"><div><label>Seconds / Question</label><input id="sec" type="number" value="45"></div><div><label>Marks / Question</label><input id="marks" type="number" value="1"></div><div><label>Codes Count</label><input id="count" type="number" value="50"></div></div>
+          <div class="grid"><div><label>Negative Marking</label><select id="negativeOn"><option value="off">OFF</option><option value="on">ON</option></select></div><div><label>Negative Marks / Wrong</label><input id="negativeMark" type="number" step="0.01" value="0.25"></div></div><label>Paste Questions</label><textarea id="bits" placeholder="Paste questions here..."></textarea>
+          <button class="p" id="saveExamBtn">Save Exam + Generate Codes</button><button class="g" id="loadExamsBtn">Load Exams</button><pre id="codesBox"></pre><div id="examsBox"></div>
+        </section>
+        <section id="view-questions" class="view card hide"><h2>✏️ Question Editor</h2><div class="grid"><input id="qeExamId" placeholder="Exam ID"><button class="g" id="loadQuestionsBtn">Load Questions</button></div><div id="questionsBox"></div></section>
+        <section id="view-students" class="view card hide"><h2>👨‍🎓 Students</h2><button class="g" id="loadStudentsBtn">Load Students</button><button class="s" id="exportStudentsBtn">Export CSV</button><div id="studentsBox"></div></section>
+        <section id="view-reports" class="view card hide">
+          <h2>📈 Reports + Rank List</h2>
+          <div class="grid"><input id="reportExamId" placeholder="Exam ID"><button class="g" id="loadResultsBtn">Load Results</button></div>
+          <button class="s" id="exportResultsBtn">Export Results CSV</button>
+          <div id="rankStatsBox" class="stat-grid"></div>
+          <div id="leaderBox"></div>
+          <div id="resultsBox"></div>
+        </section>
+        <section id="view-settings" class="view card hide"><h2>⚙️ Settings</h2><button class="s" id="darkBtn">Toggle Dark Mode</button><div class="notice">Version L3.3 Production Final - Negative Marks</div></section>
+      </main>
+    </div>
+  </div>
+</div>
+<script type="module" src="admin.js?v=l33neg1"></script>
+</body></html>
