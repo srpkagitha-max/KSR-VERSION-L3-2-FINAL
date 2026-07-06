@@ -312,3 +312,44 @@ document.addEventListener("click", function(e){
     importPdfQuestionsStandard();
   }
 }, true);
+
+
+// L3.6 OCR SCANNED PDF
+async function ocrScannedPdfQuestions(){
+  const fileEl=$("pdfFile"), msgEl=$("pdfImportMsg"), qualityBox=$("pdfQualityBox");
+  try{
+    if(!fileEl || !fileEl.files || !fileEl.files[0]) return alert("Please select scanned/image PDF");
+    if(msgEl) msgEl.innerHTML='<span class="pdf-warn">OCR starting... do not close page.</span>';
+    if(qualityBox){qualityBox.classList.remove("hide");qualityBox.innerHTML='<div class="ocr-progress">Loading OCR engine...</div>';}
+    const pdfjs=await import("https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.mjs");
+    pdfjs.GlobalWorkerOptions.workerSrc="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.mjs";
+    const tess=await import("https://cdn.jsdelivr.net/npm/tesseract.js@5.1.1/+esm");
+    const data=await fileEl.files[0].arrayBuffer();
+    const pdf=await pdfjs.getDocument({data}).promise;
+    const worker=await tess.createWorker(["eng","tel"],1,{logger:m=>{if(qualityBox&&m.status){qualityBox.innerHTML='<div class="ocr-progress">OCR: '+m.status+' '+(m.progress?Math.round(m.progress*100):'')+'%</div>';}}});
+    let allText="", maxPages=Math.min(pdf.numPages,35);
+    for(let i=1;i<=maxPages;i++){
+      if(qualityBox) qualityBox.innerHTML='<div class="ocr-progress">OCR Page '+i+' / '+maxPages+' running...</div>';
+      const page=await pdf.getPage(i), viewport=page.getViewport({scale:2});
+      const canvas=document.createElement("canvas"), ctx=canvas.getContext("2d");
+      canvas.width=viewport.width; canvas.height=viewport.height;
+      await page.render({canvasContext:ctx,viewport}).promise;
+      const res=await worker.recognize(canvas);
+      allText+="\n"+(res.data.text||"");
+    }
+    await worker.terminate();
+    const formatted=(typeof normalizePdfQuestionsStandard==="function")?normalizePdfQuestionsStandard(allText):allText;
+    $("bits").value=formatted||allText;
+    const q=(formatted.match(/^\d+\.\s/gm)||[]).length, o=(formatted.match(/^[A-D]\.\s/gm)||[]).length, a=(formatted.match(/^Answer:\s*[A-D]/gmi)||[]).length;
+    if(msgEl) msgEl.innerHTML='<span class="pdf-ok">OCR completed. Review questions before Save Exam.</span>';
+    if(qualityBox) qualityBox.innerHTML='<b>OCR Import Quality Report</b><br>Pages OCR Done: '+maxPages+' / '+pdf.numPages+'<br>Detected Questions: '+q+'<br>Detected Options: '+o+'<br>Detected Answers: '+a+'<div class="ocr-note"><b>Important:</b><br>OCR mistakes ravachu. Questions/options/answers verify chesi Save Exam cheyyi.</div>';
+    alert("OCR completed. Please review before saving.");
+  }catch(e){
+    if(msgEl) msgEl.innerHTML='<span class="pdf-bad">OCR failed: '+e.message+'</span>';
+    if(qualityBox){qualityBox.classList.remove("hide");qualityBox.innerHTML='<span class="quality-bad">OCR failed. Mobile memory/network issue kavachu. Smaller PDF try cheyyi.</span>';}
+    alert("OCR failed: "+e.message);
+  }
+}
+document.addEventListener("click",function(e){
+  if(e.target && e.target.id==="ocrPdfBtn"){e.preventDefault();e.stopImmediatePropagation();ocrScannedPdfQuestions();}
+},true);
