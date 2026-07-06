@@ -353,3 +353,11 @@ async function ocrScannedPdfQuestions(){
 document.addEventListener("click",function(e){
   if(e.target && e.target.id==="ocrPdfBtn"){e.preventDefault();e.stopImmediatePropagation();ocrScannedPdfQuestions();}
 },true);
+
+// L4_CLEAN_CLICK_GUARD
+let __ksrImportBusy = false;
+async function ksrGuardRun(fn){
+  if(__ksrImportBusy) return;
+  __ksrImportBusy = true;
+  try{ await fn(); } finally { setTimeout(()=>__ksrImportBusy=false, 500); }
+}

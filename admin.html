@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="te">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR Version L4.0 Part-2 PDF + OCR Restore</title><link rel="stylesheet" href="style.css"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR Version L4.0 Part-2 PDF + OCR Clean Final</title><link rel="stylesheet" href="style.css"></head>
 <body>
-<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L4.0 Part-2 PDF + OCR Restore</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
+<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L4.0 Part-2 PDF + OCR Clean Final</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
 <div class="wrap">
   <div id="loginCard" class="card">
     <h2>Admin Login</h2>
@@ -10,7 +10,7 @@
     <button class="p" id="loginBtn" type="button">Login</button><p id="loginMsg" class="small"></p>
   </div>
   <div id="app" class="hide">
-    <div class="card top"><h2>Dashboard <span class="badge">Version L4.0 Part-2 PDF + OCR Restore</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
+    <div class="card top"><h2>Dashboard <span class="badge">Version L4.0 Part-2 PDF + OCR Clean Final</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
     <div class="layout">
       <div class="sidebar">
         <button class="sidebtn active" data-view="dashboard">📊 Dashboard</button>
@@ -37,10 +37,11 @@
           <div class="grid3"><div><label>Institute ID</label><input id="examInstituteId"></div><div><label>Category</label><input id="examCategory" value="DSC"></div><div><label>Pass %</label><input id="passMark" type="number" value="35"></div></div>
           <div class="grid3"><div><label>Seconds / Question</label><input id="sec" type="number" value="45"></div><div><label>Marks / Question</label><input id="marks" type="number" value="1"></div><div><label>Codes Count</label><input id="count" type="number" value="50"></div></div>
           <div class="grid"><div><label>Negative Marking</label><select id="negativeOn"><option value="off">OFF</option><option value="on">ON</option></select></div><div><label>Negative Marks / Wrong</label><input id="negativeMark" type="number" step="0.01" value="0.25"></div></div><div class="exam-card">
-<h3>📄 PDF Auto Import</h3>
-<input id="pdfFile" type="file" accept="application/pdf">
-<button class="g" id="importPdfBtn" type="button">Import Text PDF</button><button class="o" id="ocrPdfBtn" type="button">OCR Scanned PDF</button><button class="o" id="ocrPdfBtn" type="button">OCR Scanned PDF</button>
-<div id="pdfImportMsg" class="small"></div><div id="pdfQualityBox" class="exam-card hide"></div>
+  <h3>📄 PDF Auto Import</h3>
+  <input id="pdfFile" type="file" accept="application/pdf">
+  <button class="g" id="importPdfBtn" type="button">Import Text PDF</button>
+  <button class="o" id="ocrPdfBtn" type="button">OCR Scanned PDF</button><div id="pdfImportMsg" class="small"></div>
+  <div id="pdfQualityBox" class="exam-card hide"></div>
 </div><label>Paste Questions</label><textarea id="bits" placeholder="Paste questions here..."></textarea>
           <button class="p" id="saveExamBtn">Save Exam + Generate Codes</button><button class="g" id="loadExamsBtn">Load Exams</button><pre id="codesBox"></pre><div id="examsBox"></div>
         </section>
@@ -54,10 +55,10 @@
           <div id="leaderBox"></div>
           <div id="resultsBox"></div>
         </section>
-        <section id="view-settings" class="view card hide"><h2>⚙️ Settings</h2><button class="g" id="dbHealthBtn">Check Firebase DB</button><div id="dbHealthBox" class="exam-card"></div><button class="s" id="darkBtn">Toggle Dark Mode</button><div class="notice">Version L4.0 Part-2 PDF + OCR Restore</div></section>
+        <section id="view-settings" class="view card hide"><h2>⚙️ Settings</h2><button class="g" id="dbHealthBtn">Check Firebase DB</button><div id="dbHealthBox" class="exam-card"></div><button class="s" id="darkBtn">Toggle Dark Mode</button><div class="notice">Version L4.0 Part-2 PDF + OCR Clean Final</div></section>
       </main>
     </div>
   </div>
 </div>
-<script type="module" src="admin.js?v=l40p2pdfocr"></script>
+<script type="module" src="admin.js?v=l40p2clean1"></script>
 </body></html>
