@@ -722,3 +722,16 @@ document.addEventListener("click",function(e){
   if(e.target.id==="generatePaperBtn"){e.preventDefault();e.stopImmediatePropagation();generateQuestionPaperPro();}
   if(e.target.id==="generateOmrBtn"){e.preventDefault();e.stopImmediatePropagation();generateOMRPro();}
 },true);
+
+
+// L5.0 SPRINT-1 ADMIN LIVE MONITOR
+async function loadLiveMonitor(){
+  try{
+    const examId=safe($("liveExamId").value);if(!examId)return alert("Enter Exam ID");
+    const snap=await getDocs(collection(db,"exams",examId,"sessions")), rows=[];snap.forEach(d=>rows.push({id:d.id,...d.data()}));
+    const online=rows.filter(r=>r.status==="running").length, submitted=rows.filter(r=>String(r.status||"").includes("submitted")).length, avg=rows.length?Math.round(rows.reduce((a,r)=>a+(Number(r.progress)||0),0)/rows.length):0, viol=rows.reduce((a,r)=>a+(Number(r.violations)||0),0);
+    $("liveStatsBox").innerHTML=`<div class="stat"><div class="label">Sessions</div><div class="value">${rows.length}</div></div><div class="stat"><div class="label">Online</div><div class="value">${online}</div></div><div class="stat"><div class="label">Submitted</div><div class="value">${submitted}</div></div><div class="stat"><div class="label">Avg Progress</div><div class="value">${avg}%</div></div><div class="stat"><div class="label">Violations</div><div class="value">${viol}</div></div>`;
+    $("liveMonitorBox").innerHTML=rows.map(r=>`<div class="live-card"><b>${esc(r.name||"-")}</b> <span class="pill">${esc(r.code||r.id)}</span><br>Phone: ${esc(r.phone||"-")} | Status: <b>${esc(r.status||"-")}</b><br>Current Q: ${Number(r.currentQuestion||0)+1} / ${r.totalQuestions||"-"} | Progress: ${r.progress||0}% | Remaining: ${fmt(r.remainingTime||0)}<br>Violations: <span class="violation">${r.violations||0}</span> ${r.lastViolation?("| Last: "+esc(r.lastViolation)):""}<br>Last Saved: ${esc(r.updatedAt||"-")}</div>`).join("")||`<div class="notice">No live sessions found.</div>`;
+  }catch(e){alert("Live monitor failed: "+e.message)}
+}
+document.addEventListener("click",function(e){if(e.target&&e.target.id==="loadLiveMonitorBtn"){e.preventDefault();loadLiveMonitor()}},true);

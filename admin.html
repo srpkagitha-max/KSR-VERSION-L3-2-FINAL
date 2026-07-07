@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="te">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR L4.5 Print Pack Admin</title><link rel="stylesheet" href="style.css?v=l45printpack1"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR L5.0 Secure Admin</title><link rel="stylesheet" href="style.css?v=l50s1secure"></head>
 <body>
-<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L4.5 Professional Print Pack</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
+<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L5.0 Sprint-1 Secure Exam Engine</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
 <div class="wrap">
   <div id="loginCard" class="card">
     <h2>Admin Login</h2>
@@ -10,7 +10,7 @@
     <button class="p" id="loginBtn" type="button">Login</button><p id="loginMsg" class="small"></p>
   </div>
   <div id="app" class="hide">
-    <div class="card top"><h2>Dashboard <span class="badge">L4.5 Print Pack</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
+    <div class="card top"><h2>Dashboard <span class="badge">L5.0 Secure</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
     <div class="layout">
       <div class="sidebar">
         <button class="sidebtn active" data-view="dashboard">📊 Dashboard</button>
@@ -20,6 +20,7 @@
         <button class="sidebtn" data-view="qbank">📚 Question Bank</button>
         <button class="sidebtn" data-view="students">👨‍🎓 Students</button>
         <button class="sidebtn" data-view="reports">📈 Reports</button>
+        <button class="sidebtn" data-view="live">🟢 Live Monitor</button>
         <button class="sidebtn" data-view="printtools">🖨️ PDF / OMR Tools</button>
         <button class="sidebtn" data-view="settings">⚙️ Settings</button>
       </div>
@@ -194,9 +195,15 @@
   <div class="notice">Use browser Print → Save as PDF to download.</div>
 </section>
 
+      <section id="view-live" class="view card hide">
+  <h2>🟢 Live Exam Monitor</h2>
+  <div class="grid"><input id="liveExamId" placeholder="Exam ID e.g. DSC001"><button class="g" id="loadLiveMonitorBtn" type="button">Load Live Monitor</button></div>
+  <div id="liveStatsBox" class="stat-grid"></div><div id="liveMonitorBox"></div>
+  <div class="notice">Auto-save sessions and violation logs appear here.</div>
+</section>
       </main>
     </div>
   </div>
 </div>
-<script type="module" src="admin.js?v=l45printpack1"></script>
+<script type="module" src="admin.js?v=l50s1secure"></script>
 </body></html>
