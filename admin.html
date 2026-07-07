@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="te">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR L4.2 QB Pro+ Admin</title><link rel="stylesheet" href="style.css?v=l42qbankplus1"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR L4.3 Enterprise Admin</title><link rel="stylesheet" href="style.css?v=l43enterprise2"></head>
 <body>
-<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L4.2 Enterprise Question Bank Pro+</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
+<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L4.3 Enterprise Part-1</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
 <div class="wrap">
   <div id="loginCard" class="card">
     <h2>Admin Login</h2>
@@ -10,7 +10,7 @@
     <button class="p" id="loginBtn" type="button">Login</button><p id="loginMsg" class="small"></p>
   </div>
   <div id="app" class="hide">
-    <div class="card top"><h2>Dashboard <span class="badge">L4.2 QB Pro+</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
+    <div class="card top"><h2>Dashboard <span class="badge">L4.3 Enterprise</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
     <div class="layout">
       <div class="sidebar">
         <button class="sidebtn active" data-view="dashboard">📊 Dashboard</button>
@@ -94,7 +94,36 @@
   <div class="small">Generated questions will be added to Exams → Paste Questions textarea.</div>
 </div>
 
-  <hr>
+  
+<div class="exam-card">
+  <h3>⚖️ Balanced Paper Generator</h3>
+  <div class="grid3">
+    <div><label>Easy Count</label><input id="easyCount" type="number" value="5"></div>
+    <div><label>Medium Count</label><input id="mediumCount" type="number" value="10"></div>
+    <div><label>Hard Count</label><input id="hardCount" type="number" value="5"></div>
+  </div>
+  <div class="grid3">
+    <div><label>Subject</label><input id="balancedSubject" placeholder="Optional subject"></div>
+    <div><label>Chapter</label><input id="balancedChapter" placeholder="Optional chapter"></div>
+    <div><label>Topic</label><input id="balancedTopic" placeholder="Optional topic"></div>
+  </div>
+  <button class="p" id="balancedGenerateBtn" type="button">Generate Balanced Paper</button>
+</div>
+<div class="exam-card">
+  <h3>📦 Backup / Restore Question Bank</h3>
+  <button class="s" id="exportQBankJsonBtn" type="button">Export JSON Backup</button>
+  <input id="importQBankJsonFile" type="file" accept="application/json">
+  <button class="g" id="importQBankJsonBtn" type="button">Import JSON Backup</button>
+  <div id="backupMsg" class="small"></div>
+</div>
+<div class="exam-card">
+  <h3>📊 Question Bank Analytics</h3>
+  <button class="g" id="loadQBankAnalyticsBtn" type="button">Load Analytics</button>
+  <div id="qbankAnalyticsBox" class="stat-grid"></div>
+  <div id="qbankSubjectStats"></div>
+</div>
+
+<hr>
   <h3>🔍 Search & Filter</h3>
   <div class="grid3">
     <input id="qbSearch" placeholder="Search text">
@@ -121,5 +150,5 @@
     </div>
   </div>
 </div>
-<script type="module" src="admin.js?v=l42qbankplus1"></script>
+<script type="module" src="admin.js?v=l43enterprise2"></script>
 </body></html>

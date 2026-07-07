@@ -27,3 +27,5 @@ table{width:100%;border-collapse:collapse;background:white;margin-top:12px}th,td
 .qbank-head{display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
 .qbank-card.selected{background:#e8f0fe;border-left-color:#137333}
 .qbank-danger{background:#fce8e6;border-left:6px solid #d93025;border-radius:14px;padding:12px;margin:10px 0}
+
+.fav-star{background:#fff8db;border:1px solid #fbbc04;color:#8a5a00}.fav-active{background:#fbbc04!important;color:#111!important}.subject-stat{background:#f8fbff;border:1px solid #dbe7ff;border-radius:14px;padding:10px;margin:8px 0}.qbank-card.selected{background:#e8f0fe}

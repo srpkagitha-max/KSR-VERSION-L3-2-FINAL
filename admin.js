@@ -479,3 +479,81 @@ document.addEventListener("click", function(e){
   if(e.target.id==="deleteSelectedQBankBtn"){ e.preventDefault(); deleteSelectedQBank(); }
   if(e.target.id==="generateFromQBankBtn"){ e.preventDefault(); generateExamFromQBank(); }
 }, true);
+
+
+// L4.3 ENTERPRISE PART-1 ADVANCED QBANK
+async function toggleFavoriteQBank(id){
+  try{
+    const x=qbankCache.find(q=>q.id===id);
+    const fav=!(x&&x.favorite);
+    await setDoc(doc(db,"questionBank",id),{favorite:fav,updatedAt:serverTimestamp()},{merge:true});
+    if(x)x.favorite=fav;
+    renderQBank((qbankCache||[]).filter(x=>!x.deleted));
+  }catch(e){alert("Favorite failed: "+e.message)}
+}
+window.toggleFavoriteQBank=toggleFavoriteQBank;
+
+const __renderQBankL42Backup = renderQBank;
+renderQBank = function(rows){
+  rows=(rows||[]).filter(x=>!x.deleted);
+  const stats=$("qbankStats"), box=$("qbankBox");
+  if(stats){
+    const easy=rows.filter(x=>x.difficulty==="Easy").length, med=rows.filter(x=>x.difficulty==="Medium").length, hard=rows.filter(x=>x.difficulty==="Hard").length, fav=rows.filter(x=>x.favorite).length;
+    stats.innerHTML=`<div class="stat"><div class="label">Questions</div><div class="value">${rows.length}</div></div><div class="stat"><div class="label">Favorites</div><div class="value">${fav}</div></div><div class="stat"><div class="label">Easy</div><div class="value">${easy}</div></div><div class="stat"><div class="label">Medium</div><div class="value">${med}</div></div><div class="stat"><div class="label">Hard</div><div class="value">${hard}</div></div>`;
+  }
+  if(!box)return;
+  if(!rows.length){box.innerHTML=`<div class="notice">No questions found.</div>`;updateQBankSelectedCount();return;}
+  box.innerHTML=rows.map((x,i)=>{
+    const o=x.o||["","","",""], checked=qbankSelected.has(x.id)?"checked":"", favCls=x.favorite?"fav-active":"fav-star";
+    return `<div class="qbank-card" data-qbid="${x.id}">
+      <div class="qbank-head"><h3><input class="qbank-check" type="checkbox" ${checked} onchange="window.toggleQBankSelect('${x.id}',this.checked)"> QB ${i+1}</h3><span><button class="${favCls}" type="button" onclick="window.toggleFavoriteQBank('${x.id}')">⭐</button> <span class="pill">${esc(x.difficulty||"-")}</span></span></div>
+      <div class="qbank-meta">Subject: ${esc(x.subject||"General")} | Chapter: ${esc(x.chapter||"-")} | Topic: ${esc(x.topic||"-")} | Used: ${x.usageCount||0}</div>
+      <div class="qbank-mini"><b>Q:</b> ${esc(x.q||"")}</div>
+      <div class="qbank-mini">A) ${esc(o[0]||"")}</div><div class="qbank-mini">B) ${esc(o[1]||"")}</div><div class="qbank-mini">C) ${esc(o[2]||"")}</div><div class="qbank-mini">D) ${esc(o[3]||"")}</div>
+      <div class="qbank-mini"><b>Answer:</b> ${"ABCD"[Number(x.a)||0]}</div>${x.explanation?`<div class="qbank-mini"><b>Explanation:</b> ${esc(x.explanation)}</div>`:""}
+      <div class="qbank-actions"><button class="s" onclick="window.editQBank('${x.id}')">Edit</button><button class="s" onclick="window.duplicateQBankQuestion('${x.id}')">Duplicate</button><button class="g" onclick="window.addQBankToExam('${x.id}')">Add to Exam</button><button class="d" onclick="window.deleteQBankQuestion('${x.id}')">Delete</button></div>
+    </div>`;
+  }).join("");
+  updateQBankSelectedCount();
+};
+
+function shuffleQ(rows){rows=[...rows];for(let i=rows.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[rows[i],rows[j]]=[rows[j],rows[i]]}return rows}
+function filterBalanced(rows,sub,chap,topic,diff){
+  return rows.filter(x=>!x.deleted && (!sub||qbNorm(x.subject)===sub) && (!chap||qbNorm(x.chapter).includes(chap)) && (!topic||qbNorm(x.topic).includes(topic)) && (!diff||x.difficulty===diff));
+}
+async function generateBalancedPaper(){
+  try{
+    const all=await loadAllQBankForBuilder(), sub=qbNorm(qbVal("balancedSubject")), chap=qbNorm(qbVal("balancedChapter")), topic=qbNorm(qbVal("balancedTopic"));
+    const picked=[...shuffleQ(filterBalanced(all,sub,chap,topic,"Easy")).slice(0,Number(qbVal("easyCount")||0)),...shuffleQ(filterBalanced(all,sub,chap,topic,"Medium")).slice(0,Number(qbVal("mediumCount")||0)),...shuffleQ(filterBalanced(all,sub,chap,topic,"Hard")).slice(0,Number(qbVal("hardCount")||0))];
+    if(!picked.length)return alert("No questions matched filters");
+    $("bits").value=qbankToBits(shuffleQ(picked));
+    alert("Balanced paper generated: "+picked.length+" questions. Go to Exams tab and Save Exam.");
+  }catch(e){alert("Balanced generate failed: "+e.message)}
+}
+async function loadQBankAnalytics(){
+  try{
+    const rows=(await loadAllQBankForBuilder()).filter(x=>!x.deleted), subjects={}, chapters={};
+    rows.forEach(x=>{subjects[x.subject||"General"]=(subjects[x.subject||"General"]||0)+1;chapters[x.chapter||"-"]=(chapters[x.chapter||"-"]||0)+1});
+    $("qbankAnalyticsBox").innerHTML=`<div class="stat"><div class="label">Total QB</div><div class="value">${rows.length}</div></div><div class="stat"><div class="label">Favorites</div><div class="value">${rows.filter(x=>x.favorite).length}</div></div><div class="stat"><div class="label">Subjects</div><div class="value">${Object.keys(subjects).length}</div></div><div class="stat"><div class="label">Chapters</div><div class="value">${Object.keys(chapters).length}</div></div>`;
+    $("qbankSubjectStats").innerHTML="<h3>Subject-wise Count</h3>"+Object.entries(subjects).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class="subject-stat"><b>${esc(k)}</b>: ${v}</div>`).join("");
+  }catch(e){alert("Analytics failed: "+e.message)}
+}
+function exportQBankJson(){
+  const data=(qbankCache||[]).filter(x=>!x.deleted);
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:"application/json"}));a.download="ksr_question_bank_backup.json";a.click();
+}
+async function importQBankJson(){
+  try{
+    const file=$("importQBankJsonFile")?.files?.[0];if(!file)return alert("Select JSON backup file");
+    const data=JSON.parse(await file.text());if(!Array.isArray(data))return alert("Invalid JSON backup");
+    let count=0;for(const x of data){if(!x.q||!x.o)continue;const id=x.id||qbKey(x.subject||"General",x.q);const clean={...x};delete clean.id;await setDoc(doc(db,"questionBank",id),{...clean,importedAt:serverTimestamp(),updatedAt:serverTimestamp()},{merge:true});count++}
+    $("backupMsg").innerHTML=`<span class="ok">Imported ${count} questions.</span>`;alert("Imported "+count+" questions");loadQBank();
+  }catch(e){$("backupMsg").innerHTML=`<span class="bad">${e.message}</span>`;alert("Import failed: "+e.message)}
+}
+document.addEventListener("click",function(e){
+  if(!e.target)return;
+  if(e.target.id==="balancedGenerateBtn"){e.preventDefault();generateBalancedPaper()}
+  if(e.target.id==="loadQBankAnalyticsBtn"){e.preventDefault();loadQBankAnalytics()}
+  if(e.target.id==="exportQBankJsonBtn"){e.preventDefault();exportQBankJson()}
+  if(e.target.id==="importQBankJsonBtn"){e.preventDefault();importQBankJson()}
+},true);
