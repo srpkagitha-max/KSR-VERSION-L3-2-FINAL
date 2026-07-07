@@ -1001,3 +1001,51 @@ document.addEventListener("click", function(e){
     return false;
   }
 }, true);
+
+
+// L5.0 BITS PREVIEW BEFORE SAVE
+function ksrPreviewEsc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}
+function ksrRenderBitsPreview(){
+  const box=document.getElementById("bitsPreviewBox"), bits=document.getElementById("bits");
+  if(!box||!bits)return;
+  const parser=(typeof ksrParseQuestionsUltra==="function")?ksrParseQuestionsUltra:(typeof ksrParseQuestionsFull==="function"?ksrParseQuestionsFull:parseBits);
+  const qs=parser(bits.value||"");
+  if(!qs.length){
+    box.innerHTML=`<div class="preview-panel preview-bad"><h3>⚠️ Preview</h3><p>Questions detect కాలేదు. A/B/C/D options ఉన్నాయో check చేయండి.</p></div>`;
+    box.scrollIntoView({behavior:"smooth",block:"start"});
+    return;
+  }
+  const subjectCounts={};
+  qs.forEach(q=>subjectCounts[q.subject||"General"]=(subjectCounts[q.subject||"General"]||0)+1);
+  const stats=Object.entries(subjectCounts).map(([k,v])=>`<span class="pill">${ksrPreviewEsc(k)}: ${v}</span>`).join(" ");
+  box.innerHTML=`<div class="preview-panel">
+    <h3>👀 Questions Preview</h3>
+    <div class="stat-grid">
+      <div class="stat"><div class="label">Detected Questions</div><div class="value">${qs.length}</div></div>
+      <div class="stat"><div class="label">Subjects</div><div class="value">${Object.keys(subjectCounts).length}</div></div>
+    </div>
+    <div style="margin:8px 0">${stats}</div>
+    <div class="preview-actions">
+      <button class="p" type="button" onclick="document.getElementById('saveExamBtn').click()">✅ Preview OK - Save Exam</button>
+      <button class="s" type="button" onclick="document.getElementById('bitsPreviewBox').innerHTML=''">Close Preview</button>
+    </div>
+    ${qs.map((q,i)=>{
+      const o=q.o||[], ans=Number(q.a)||0;
+      return `<div class="preview-q-card">
+        <h3>Q${i+1}. ${ksrPreviewEsc(q.q||"")}</h3>
+        <div class="preview-opt ${ans===0?'preview-correct':''}">A) ${ksrPreviewEsc(o[0]||"")}</div>
+        <div class="preview-opt ${ans===1?'preview-correct':''}">B) ${ksrPreviewEsc(o[1]||"")}</div>
+        <div class="preview-opt ${ans===2?'preview-correct':''}">C) ${ksrPreviewEsc(o[2]||"")}</div>
+        <div class="preview-opt ${ans===3?'preview-correct':''}">D) ${ksrPreviewEsc(o[3]||"")}</div>
+        <b>Answer: ${"ABCD"[ans]||"A"}</b> <span class="pill">${ksrPreviewEsc(q.subject||"General")}</span>
+      </div>`;
+    }).join("")}
+  </div>`;
+  box.scrollIntoView({behavior:"smooth",block:"start"});
+}
+document.addEventListener("click",function(e){
+  if(e.target&&e.target.id==="previewBitsBtn"){
+    e.preventDefault();
+    ksrRenderBitsPreview();
+  }
+},true);
