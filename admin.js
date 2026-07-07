@@ -835,3 +835,169 @@ document.addEventListener("click",function(e){
     e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();ksrSaveExamFullFix();return false;
   }
 },true);
+
+
+// L5.0 ULTRA FLEXIBLE BITS PARSER - accepts messy Telugu/English PDF text
+function ksrCleanTextUltra(txt){
+  return String(txt||"")
+    .replace(/\r/g,"\n")
+    .replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
+    .replace(/([0-9]+)\s*[\)\-]\s*/g,"\n$1. ")
+    .replace(/\s+([ABCD])\s*[\)\.\:\-]\s*/gi,"\n$1. ")
+    .replace(/(^|\n)([ABCD])\s+/gi,"$1$2. ")
+    .replace(/జవాబు\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/సమాధానం\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/Ans(?:wer)?\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/Answer\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/\n{2,}/g,"\n")
+    .trim();
+}
+function ksrParseQuestionsUltra(txt){
+  txt = ksrCleanTextUltra(txt);
+  const lines = txt.split("\n").map(x=>x.trim()).filter(Boolean);
+  const qs = [];
+  let buffer = [];
+
+  function lineType(line){
+    if(/^Subject\s*[:：]/i.test(line)) return "subject";
+    if(/^\d+[\.\)]\s+/.test(line)) return "qno";
+    if(/^[ABCD]\s*[\.\)]\s*/i.test(line)) return "opt";
+    if(/^Answer\s*[:：]?\s*[ABCD]/i.test(line)) return "ans";
+    return "text";
+  }
+
+  // Convert text into question blocks. A block ends at Answer line.
+  let blocks = [], current = [];
+  for(const line of lines){
+    const typ=lineType(line);
+    if(typ==="qno" && current.length && current.some(x=>lineType(x)==="ans")){
+      blocks.push(current); current=[];
+    }
+    current.push(line);
+    if(typ==="ans"){ blocks.push(current); current=[]; }
+  }
+  if(current.length) blocks.push(current);
+
+  // If PDF text has many questions without answer lines, split when new qno starts.
+  let refined=[];
+  for(const b of blocks){
+    let part=[];
+    for(const line of b){
+      if(lineType(line)==="qno" && part.length){ refined.push(part); part=[]; }
+      part.push(line);
+    }
+    if(part.length) refined.push(part);
+  }
+
+  let subject="General";
+  function parseBlock(block){
+    let qLines=[], opts=["","","",""], ans=0, lastOpt=-1;
+    for(let raw of block){
+      let line=raw.trim();
+      let m;
+      if((m=line.match(/^Subject\s*[:：]\s*(.+)$/i))){ subject=m[1].trim()||subject; continue; }
+      if((m=line.match(/^\d+[\.\)]\s*(.+)$/))){ qLines.push(m[1].trim()); lastOpt=-1; continue; }
+      if((m=line.match(/^([ABCD])\s*[\.\)]\s*(.*)$/i))){
+        lastOpt="ABCD".indexOf(m[1].toUpperCase());
+        opts[lastOpt]=(m[2]||"").trim();
+        continue;
+      }
+      if((m=line.match(/^Answer\s*[:：]?\s*([ABCD])/i))){
+        ans="ABCD".indexOf(m[1].toUpperCase());
+        lastOpt=-1;
+        continue;
+      }
+      if(lastOpt>=0) opts[lastOpt]+=(opts[lastOpt]?" ":"")+line;
+      else qLines.push(line);
+    }
+    let q=qLines.join(" ").trim();
+    if(!q && block.length){
+      const firstOptIndex = block.findIndex(x=>/^[ABCD]\s*[\.\)]/i.test(x));
+      if(firstOptIndex>0) q = block.slice(0,firstOptIndex).join(" ");
+    }
+    if(q && opts.some(Boolean)){
+      // Fill missing options with blank placeholders so exam can still save
+      opts=opts.map((x,i)=>x||("Option "+("ABCD"[i])));
+      return {q,o:opts,a:ans,subject};
+    }
+    return null;
+  }
+
+  for(const b of refined){
+    const q=parseBlock(b);
+    if(q) qs.push(q);
+  }
+
+  // Last fallback: find repeated A/B/C/D groups even without question numbers
+  if(!qs.length){
+    const re = /([\s\S]*?)\n?A\.\s*([\s\S]*?)\nB\.\s*([\s\S]*?)\nC\.\s*([\s\S]*?)\nD\.\s*([\s\S]*?)(?:\nAnswer:\s*([ABCD]))?(?=\n\d+\.|\nA\.|$)/gi;
+    let m;
+    while((m=re.exec(txt))){
+      const q=(m[1]||"").trim();
+      if(q){
+        qs.push({q,o:[m[2],m[3],m[4],m[5]].map(x=>String(x||"").trim()),a:m[6]?"ABCD".indexOf(m[6].toUpperCase()):0,subject});
+      }
+    }
+  }
+  return qs;
+}
+
+// Replace previous parser and save handler with ultra parser.
+try{ ksrParseQuestionsFull = ksrParseQuestionsUltra; }catch(e){}
+try{ parseBits = ksrParseQuestionsUltra; }catch(e){ window.parseBits = ksrParseQuestionsUltra; }
+
+async function ksrSaveExamUltra(){
+  try{
+    const examId = ksrSafeId ? ksrSafeId(ksrRead("examId")) : String(document.getElementById("examId").value||"").trim().toUpperCase();
+    const raw = document.getElementById("bits")?.value || "";
+    const questions = ksrParseQuestionsUltra(raw);
+
+    if(!examId) return alert("Exam ID required");
+    if(!questions.length){
+      return alert("Questions detect కాలేదు. Text లో కనీసం A B C D options ఉండాలి.");
+    }
+
+    const count = Math.max(1, Number(document.getElementById("count")?.value || 20));
+    const codes = [];
+    for(let i=1;i<=count;i++){
+      codes.push(examId + "-" + String(i).padStart(3,"0") + "-" + Math.random().toString(36).slice(2,6).toUpperCase());
+    }
+
+    await setDoc(doc(db,"exams",examId), {
+      id: examId,
+      title: document.getElementById("examTitle")?.value || examId,
+      startTime: document.getElementById("startTime")?.value || "",
+      endTime: document.getElementById("endTime")?.value || "",
+      instituteId: document.getElementById("examInstituteId")?.value || "",
+      category: document.getElementById("examCategory")?.value || "General",
+      passMark: Number(document.getElementById("passMark")?.value || 35),
+      secondsPerQuestion: Number(document.getElementById("sec")?.value || 45),
+      sec: Number(document.getElementById("sec")?.value || 45),
+      marks: Number(document.getElementById("marks")?.value || 1),
+      codesCount: count,
+      codes,
+      negativeOn: (document.getElementById("negativeOn")?.value || "off") === "on",
+      negativeMark: Number(document.getElementById("negativeMark")?.value || 0.25),
+      questions,
+      updatedAt: serverTimestamp(),
+      createdAt: serverTimestamp()
+    }, {merge:true});
+
+    const box=document.getElementById("codesBox");
+    if(box) box.textContent = codes.join("\n");
+    alert("Exam saved ✅ Questions: " + questions.length + " | Codes: " + codes.length);
+    if(typeof loadExams==="function") loadExams();
+  }catch(e){
+    alert("Save failed: " + e.message);
+  }
+}
+
+document.addEventListener("click", function(e){
+  if(e.target && e.target.id==="saveExamBtn"){
+    e.preventDefault();
+    e.stopPropagation();
+    e.stopImmediatePropagation();
+    ksrSaveExamUltra();
+    return false;
+  }
+}, true);
