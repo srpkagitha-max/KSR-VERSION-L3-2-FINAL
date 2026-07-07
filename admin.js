@@ -308,3 +308,174 @@ document.addEventListener("click", function(e){
   if(e.target.id==="clearQBankBtn"){ e.preventDefault(); clearQBankForm(); }
   if(e.target.id==="exportQBankCsvBtn"){ e.preventDefault(); exportQBankCsv(); }
 }, true);
+
+
+// L4.2 ENTERPRISE QBANK PRO PLUS
+let qbankSelected = new Set();
+
+function updateQBankSelectedCount(){
+  const el = $("selectedQBankCount");
+  if(el) el.textContent = "Selected: " + qbankSelected.size;
+  document.querySelectorAll(".qbank-card").forEach(card=>{
+    const id = card.getAttribute("data-qbid");
+    card.classList.toggle("selected", qbankSelected.has(id));
+  });
+}
+window.toggleQBankSelect = function(id, checked){
+  if(checked) qbankSelected.add(id); else qbankSelected.delete(id);
+  updateQBankSelectedCount();
+};
+
+async function deleteQBankQuestion(id){
+  if(!confirm("Delete this Question Bank question?")) return;
+  try{
+    await setDoc(doc(db,"questionBank",id), {deleted:true, deletedAt:serverTimestamp()}, {merge:true});
+    alert("Question deleted/archived");
+    qbankSelected.delete(id);
+    loadQBank();
+  }catch(e){ alert("Delete failed: "+e.message); }
+}
+window.deleteQBankQuestion = deleteQBankQuestion;
+
+function duplicateQBankQuestion(id){
+  const x = qbankCache.find(q=>q.id===id);
+  if(!x) return alert("Question not found");
+  qbSet("qbSubject", x.subject); qbSet("qbChapter", x.chapter); qbSet("qbTopic", x.topic);
+  qbSet("qbDifficulty", x.difficulty); qbSet("qbTags", (x.tags||[]).join(","));
+  qbSet("qbLanguage", x.language || "Mixed"); qbSet("qbQuestion", (x.q||"") + " ");
+  qbSet("qbA", (x.o||[])[0]); qbSet("qbB", (x.o||[])[1]); qbSet("qbC", (x.o||[])[2]); qbSet("qbD", (x.o||[])[3]);
+  qbSet("qbAnswer", String(Number(x.a)||0)); qbSet("qbMarks", String(x.marks||1)); qbSet("qbNegative", String(x.negative||0));
+  qbSet("qbExplanation", x.explanation || "");
+  alert("Question duplicated into form. Edit and Save.");
+}
+window.duplicateQBankQuestion = duplicateQBankQuestion;
+
+// Override renderQBank to add select/delete/duplicate buttons and hide deleted
+const __oldRenderQBank = renderQBank;
+renderQBank = function(rows){
+  rows = (rows || []).filter(x=>!x.deleted);
+  const stats = $("qbankStats"), box = $("qbankBox");
+  if(stats){
+    const easy=rows.filter(x=>x.difficulty==="Easy").length, medium=rows.filter(x=>x.difficulty==="Medium").length, hard=rows.filter(x=>x.difficulty==="Hard").length;
+    const subjects=[...new Set(rows.map(x=>x.subject||"General"))].length;
+    stats.innerHTML = `<div class="stat"><div class="label">Questions</div><div class="value">${rows.length}</div></div><div class="stat"><div class="label">Subjects</div><div class="value">${subjects}</div></div><div class="stat"><div class="label">Easy</div><div class="value">${easy}</div></div><div class="stat"><div class="label">Medium</div><div class="value">${medium}</div></div><div class="stat"><div class="label">Hard</div><div class="value">${hard}</div></div>`;
+  }
+  if(!box) return;
+  if(!rows.length){ box.innerHTML = `<div class="notice">No questions found.</div>`; updateQBankSelectedCount(); return; }
+  box.innerHTML = rows.map((x,i)=>{
+    const o=x.o||["","","",""];
+    const checked = qbankSelected.has(x.id) ? "checked" : "";
+    return `<div class="qbank-card" data-qbid="${x.id}">
+      <div class="qbank-head">
+        <h3><input class="qbank-check" type="checkbox" ${checked} onchange="window.toggleQBankSelect('${x.id}',this.checked)"> QB ${i+1}</h3>
+        <span class="pill">${esc(x.difficulty||"-")}</span>
+      </div>
+      <div class="qbank-meta">Subject: ${esc(x.subject||"General")} | Chapter: ${esc(x.chapter||"-")} | Topic: ${esc(x.topic||"-")} | Used: ${x.usageCount||0}</div>
+      <div class="qbank-mini"><b>Q:</b> ${esc(x.q||"")}</div>
+      <div class="qbank-mini">A) ${esc(o[0]||"")}</div>
+      <div class="qbank-mini">B) ${esc(o[1]||"")}</div>
+      <div class="qbank-mini">C) ${esc(o[2]||"")}</div>
+      <div class="qbank-mini">D) ${esc(o[3]||"")}</div>
+      <div class="qbank-mini"><b>Answer:</b> ${"ABCD"[Number(x.a)||0]}</div>
+      ${x.explanation ? `<div class="qbank-mini"><b>Explanation:</b> ${esc(x.explanation)}</div>` : ""}
+      <div class="qbank-actions">
+        <button class="s" type="button" onclick="window.editQBank('${x.id}')">Edit</button>
+        <button class="s" type="button" onclick="window.duplicateQBankQuestion('${x.id}')">Duplicate</button>
+        <button class="g" type="button" onclick="window.addQBankToExam('${x.id}')">Add to Exam</button>
+        <button class="d" type="button" onclick="window.deleteQBankQuestion('${x.id}')">Delete</button>
+      </div>
+    </div>`;
+  }).join("");
+  updateQBankSelectedCount();
+};
+
+async function loadAllQBankForBuilder(){
+  const snap = await getDocs(collection(db,"questionBank"));
+  const arr = [];
+  snap.forEach(d=>arr.push({id:d.id,...d.data()}));
+  qbankCache = arr.filter(x=>!x.deleted);
+  return qbankCache;
+}
+
+function qbankToBits(rows){
+  return rows.map((x,i)=>{
+    const o=x.o||["","","",""];
+    return `${i+1}. ${x.q||""}
+A. ${o[0]||""}
+B. ${o[1]||""}
+C. ${o[2]||""}
+D. ${o[3]||""}
+Answer: ${"ABCD"[Number(x.a)||0]}`;
+  }).join("\n\n");
+}
+
+async function addSelectedQBankToExam(){
+  try{
+    if(!qbankCache.length) await loadAllQBankForBuilder();
+    const rows = qbankCache.filter(x=>qbankSelected.has(x.id) && !x.deleted);
+    if(!rows.length) return alert("Select questions first");
+    const bits = $("bits");
+    if(!bits) return alert("Exam textarea not found");
+    const start = (bits.value.match(/^\d+\./gm)||[]).length;
+    const text = rows.map((x,i)=>{
+      const o=x.o||["","","",""];
+      return `${start+i+1}. ${x.q||""}
+A. ${o[0]||""}
+B. ${o[1]||""}
+C. ${o[2]||""}
+D. ${o[3]||""}
+Answer: ${"ABCD"[Number(x.a)||0]}`;
+    }).join("\n\n");
+    bits.value += (bits.value.trim() ? "\n\n" : "") + text;
+    alert(rows.length + " questions added to Exam textarea");
+  }catch(e){ alert("Add selected failed: "+e.message); }
+}
+
+async function deleteSelectedQBank(){
+  try{
+    if(!qbankSelected.size) return alert("Select questions first");
+    if(!confirm("Delete selected "+qbankSelected.size+" questions?")) return;
+    for(const id of qbankSelected){
+      await setDoc(doc(db,"questionBank",id), {deleted:true, deletedAt:serverTimestamp()}, {merge:true});
+    }
+    qbankSelected.clear();
+    alert("Selected questions deleted/archived");
+    loadQBank();
+  }catch(e){ alert("Delete selected failed: "+e.message); }
+}
+
+async function generateExamFromQBank(){
+  try{
+    const all = await loadAllQBankForBuilder();
+    const sub = qbNorm(qbVal("buildSubject"));
+    const chap = qbNorm(qbVal("buildChapter"));
+    const topic = qbNorm(qbVal("buildTopic"));
+    const diff = qbVal("buildDifficulty");
+    const count = Number(qbVal("buildCount")||20);
+    let rows = all.filter(x=>{
+      if(sub && qbNorm(x.subject)!==sub) return false;
+      if(chap && !qbNorm(x.chapter).includes(chap)) return false;
+      if(topic && !qbNorm(x.topic).includes(topic)) return false;
+      if(diff && x.difficulty!==diff) return false;
+      return true;
+    });
+    if(qbVal("buildShuffle")==="on"){
+      for(let i=rows.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [rows[i],rows[j]]=[rows[j],rows[i]]; }
+    }
+    rows = rows.slice(0,count);
+    if(!rows.length) return alert("No questions matched filters");
+    const bits = $("bits");
+    if(!bits) return alert("Exam textarea not found");
+    bits.value = qbankToBits(rows);
+    alert("Generated "+rows.length+" questions into Exam textarea. Go to Exams tab and Save Exam.");
+  }catch(e){ alert("Generate failed: "+e.message); }
+}
+
+document.addEventListener("click", function(e){
+  if(!e.target) return;
+  if(e.target.id==="selectAllQBankBtn"){ e.preventDefault(); qbankCache.filter(x=>!x.deleted).forEach(x=>qbankSelected.add(x.id)); updateQBankSelectedCount(); renderQBank(qbankCache); }
+  if(e.target.id==="clearSelectQBankBtn"){ e.preventDefault(); qbankSelected.clear(); updateQBankSelectedCount(); renderQBank(qbankCache); }
+  if(e.target.id==="addSelectedQBankBtn"){ e.preventDefault(); addSelectedQBankToExam(); }
+  if(e.target.id==="deleteSelectedQBankBtn"){ e.preventDefault(); deleteSelectedQBank(); }
+  if(e.target.id==="generateFromQBankBtn"){ e.preventDefault(); generateExamFromQBank(); }
+}, true);

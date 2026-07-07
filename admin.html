@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="te">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR L4.1 Question Bank Pro Admin</title><link rel="stylesheet" href="style.css?v=l41qbankpro2"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR L4.2 QB Pro+ Admin</title><link rel="stylesheet" href="style.css?v=l42qbankplus1"></head>
 <body>
-<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L4.1 Central Question Bank Pro</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
+<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L4.2 Enterprise Question Bank Pro+</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
 <div class="wrap">
   <div id="loginCard" class="card">
     <h2>Admin Login</h2>
@@ -10,7 +10,7 @@
     <button class="p" id="loginBtn" type="button">Login</button><p id="loginMsg" class="small"></p>
   </div>
   <div id="app" class="hide">
-    <div class="card top"><h2>Dashboard <span class="badge">L4.1 Question Bank Pro</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
+    <div class="card top"><h2>Dashboard <span class="badge">L4.2 QB Pro+</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
     <div class="layout">
       <div class="sidebar">
         <button class="sidebtn active" data-view="dashboard">📊 Dashboard</button>
@@ -77,6 +77,23 @@
   <label>Explanation</label><textarea id="qbExplanation" placeholder="Explanation / reference optional"></textarea>
   <button class="p" id="saveQBankBtn" type="button">Save to Question Bank</button>
   <button class="s" id="clearQBankBtn" type="button">Clear</button>
+  
+<div class="exam-card">
+  <h3>🎯 Smart Exam Builder from Question Bank</h3>
+  <div class="grid3">
+    <div><label>Subject</label><input id="buildSubject" placeholder="Psychology"></div>
+    <div><label>Chapter</label><input id="buildChapter" placeholder="Optional chapter"></div>
+    <div><label>Topic</label><input id="buildTopic" placeholder="Optional topic"></div>
+  </div>
+  <div class="grid3">
+    <div><label>Difficulty</label><select id="buildDifficulty"><option value="">Any</option><option>Easy</option><option>Medium</option><option>Hard</option></select></div>
+    <div><label>Questions Count</label><input id="buildCount" type="number" value="20"></div>
+    <div><label>Shuffle</label><select id="buildShuffle"><option value="on">ON</option><option value="off">OFF</option></select></div>
+  </div>
+  <button class="p" id="generateFromQBankBtn" type="button">Generate Exam Text</button>
+  <div class="small">Generated questions will be added to Exams → Paste Questions textarea.</div>
+</div>
+
   <hr>
   <h3>🔍 Search & Filter</h3>
   <div class="grid3">
@@ -88,6 +105,15 @@
   <button class="g" id="loadQBankBtn" type="button">Load / Search Question Bank</button>
   <button class="s" id="exportQBankCsvBtn" type="button">Export CSV</button>
   <div id="qbankStats" class="stat-grid"></div>
+  
+<div class="exam-card">
+  <button class="s" id="selectAllQBankBtn" type="button">Select All Loaded</button>
+  <button class="s" id="clearSelectQBankBtn" type="button">Clear Selection</button>
+  <button class="g" id="addSelectedQBankBtn" type="button">Add Selected to Exam</button>
+  <button class="d" id="deleteSelectedQBankBtn" type="button">Delete Selected</button>
+  <span class="pill" id="selectedQBankCount">Selected: 0</span>
+</div>
+
   <div id="qbankBox"></div>
 </section>
 
@@ -95,5 +121,5 @@
     </div>
   </div>
 </div>
-<script type="module" src="admin.js?v=l41qbankpro2"></script>
+<script type="module" src="admin.js?v=l42qbankplus1"></script>
 </body></html>

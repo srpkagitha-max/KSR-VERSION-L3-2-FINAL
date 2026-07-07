@@ -22,3 +22,8 @@ table{width:100%;border-collapse:collapse;background:white;margin-top:12px}th,td
 .qbank-meta{font-size:13px;color:#555;font-weight:900;margin:6px 0;line-height:1.5}
 .qbank-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
 .qbank-mini{font-size:14px;line-height:1.5}
+
+.qbank-check{width:auto!important;transform:scale(1.35);margin-right:8px}
+.qbank-head{display:flex;align-items:center;gap:8px;justify-content:space-between;flex-wrap:wrap}
+.qbank-card.selected{background:#e8f0fe;border-left-color:#137333}
+.qbank-danger{background:#fce8e6;border-left:6px solid #d93025;border-radius:14px;padding:12px;margin:10px 0}
