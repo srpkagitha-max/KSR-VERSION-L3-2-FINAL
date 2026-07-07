@@ -735,3 +735,57 @@ async function loadLiveMonitor(){
   }catch(e){alert("Live monitor failed: "+e.message)}
 }
 document.addEventListener("click",function(e){if(e.target&&e.target.id==="loadLiveMonitorBtn"){e.preventDefault();loadLiveMonitor()}},true);
+
+
+// L5.0 SAVE EXAM PARSER FIX - Telugu/English lenient parser
+function normalizeBitsTextL50(txt){
+  return String(txt||"")
+    .replace(/\r/g,"\n")
+    .replace(/[ＡA]\s*[\)\.]/g,"A.")
+    .replace(/[ＢB]\s*[\)\.]/g,"B.")
+    .replace(/[ＣC]\s*[\)\.]/g,"C.")
+    .replace(/[ＤD]\s*[\)\.]/g,"D.")
+    .replace(/జవాబు\s*[:：]/gi,"Answer:")
+    .replace(/సమాధానం\s*[:：]/gi,"Answer:")
+    .replace(/Ans\s*[:：]/gi,"Answer:")
+    .replace(/Answer\s*[:：]/gi,"Answer:");
+}
+function parseBitsL50(txt){
+  txt = normalizeBitsTextL50(txt);
+  const lines = txt.split("\n").map(x=>x.trim()).filter(Boolean);
+  const qs = [];
+  let curQ = null, opts = ["","","",""], ans = null, subject = "General";
+
+  function pushQ(){
+    if(curQ && curQ.trim() && opts.some(x=>x.trim())){
+      let ai = ans;
+      if(ai===null || isNaN(ai) || ai<0) ai = 0;
+      qs.push({q:curQ.trim(), o:opts.map(x=>x.trim()), a:ai, subject});
+    }
+    curQ=null; opts=["","","",""]; ans=null;
+  }
+
+  for(const line of lines){
+    const qMatch = line.match(/^(\d+)[\.\)]\s*(.+)$/);
+    const optMatch = line.match(/^([ABCD])[\.\)]\s*(.*)$/i);
+    const ansMatch = line.match(/^Answer\s*[:：]\s*([ABCD])/i);
+    const subMatch = line.match(/^Subject\s*[:：]\s*(.+)$/i);
+
+    if(subMatch){ subject = subMatch[1].trim() || "General"; continue; }
+    if(qMatch){ pushQ(); curQ = qMatch[2].trim(); continue; }
+    if(optMatch){
+      const idx = "ABCD".indexOf(optMatch[1].toUpperCase());
+      opts[idx] = optMatch[2].trim();
+      continue;
+    }
+    if(ansMatch){ ans = "ABCD".indexOf(ansMatch[1].toUpperCase()); continue; }
+
+    if(curQ && !opts.some(Boolean)) curQ += " " + line;
+    else if(curQ && opts.some(Boolean)){
+      for(let i=3;i>=0;i--){ if(opts[i]){ opts[i] += " " + line; break; } }
+    }
+  }
+  pushQ();
+  return qs;
+}
+try{ parseBits = parseBitsL50; }catch(e){ window.parseBits = parseBitsL50; }
