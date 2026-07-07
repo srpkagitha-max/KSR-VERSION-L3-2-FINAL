@@ -789,3 +789,49 @@ function parseBitsL50(txt){
   return qs;
 }
 try{ parseBits = parseBitsL50; }catch(e){ window.parseBits = parseBitsL50; }
+
+
+// L5.0 SAVE BUTTON FULL FIX
+function ksrRead(id){return (document.getElementById(id)?.value||"").trim()}
+function ksrNum(id,d=0){const v=Number(ksrRead(id));return isNaN(v)?d:v}
+function ksrSafeId(v){return String(v||"").trim().toUpperCase().replace(/[^A-Z0-9_-]/g,"")}
+function ksrParseQuestionsFull(txt){
+  txt=String(txt||"").replace(/\r/g,"\n").replace(/జవాబు\s*[:：]/gi,"Answer:").replace(/సమాధానం\s*[:：]/gi,"Answer:").replace(/Ans\s*[:：]/gi,"Answer:");
+  const lines=txt.split("\n").map(x=>x.trim()).filter(Boolean), qs=[];
+  let q="",opts=["","","",""],ans=0,subject="General";
+  function push(){if(q&&opts.some(Boolean))qs.push({q:q.trim(),o:opts.map(x=>x.trim()),a:ans,subject});q="";opts=["","","",""];ans=0}
+  for(const line of lines){
+    let m;
+    if((m=line.match(/^Subject\s*[:：]\s*(.+)$/i))){subject=m[1].trim()||"General";continue}
+    if((m=line.match(/^(\d+)[\.\)]\s*(.+)$/))){push();q=m[2].trim();continue}
+    if((m=line.match(/^([ABCD])\s*[\.\)]\s*(.*)$/i))){opts["ABCD".indexOf(m[1].toUpperCase())]=m[2].trim();continue}
+    if((m=line.match(/^Answer\s*[:：]\s*([ABCD])/i))){ans="ABCD".indexOf(m[1].toUpperCase());continue}
+    if(q&&!opts.some(Boolean))q+=" "+line;else if(q&&opts.some(Boolean)){for(let i=3;i>=0;i--){if(opts[i]){opts[i]+=" "+line;break}}}
+  }
+  push();return qs;
+}
+async function ksrSaveExamFullFix(){
+  try{
+    const examId=ksrSafeId(ksrRead("examId"));
+    const questions=ksrParseQuestionsFull(ksrRead("bits"));
+    if(!examId)return alert("Exam ID required");
+    if(!questions.length)return alert("Questions format wrong.\nUse:\n1. Question\nA. Option\nB. Option\nC. Option\nD. Option\nAnswer: B");
+    const count=Math.max(1,ksrNum("count",20)), codes=[];
+    for(let i=1;i<=count;i++)codes.push(examId+"-"+String(i).padStart(3,"0")+"-"+Math.random().toString(36).slice(2,6).toUpperCase());
+    await setDoc(doc(db,"exams",examId),{
+      id:examId,title:ksrRead("examTitle")||examId,startTime:ksrRead("startTime"),endTime:ksrRead("endTime"),
+      instituteId:ksrRead("examInstituteId"),category:ksrRead("examCategory")||"General",passMark:ksrNum("passMark",35),
+      secondsPerQuestion:ksrNum("sec",45),sec:ksrNum("sec",45),marks:ksrNum("marks",1),
+      codesCount:count,codes,negativeOn:ksrRead("negativeOn")==="on",negativeMark:ksrNum("negativeMark",0.25),
+      questions,updatedAt:serverTimestamp(),createdAt:serverTimestamp()
+    },{merge:true});
+    const box=document.getElementById("codesBox");if(box)box.textContent=codes.join("\n");
+    alert("Exam saved successfully. Questions: "+questions.length+" | Codes: "+codes.length);
+    if(typeof loadExams==="function")loadExams();
+  }catch(e){alert("Save Exam failed: "+e.message)}
+}
+document.addEventListener("click",function(e){
+  if(e.target&&e.target.id==="saveExamBtn"){
+    e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();ksrSaveExamFullFix();return false;
+  }
+},true);
