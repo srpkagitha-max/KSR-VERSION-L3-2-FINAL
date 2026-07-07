@@ -177,3 +177,134 @@ document.addEventListener("click", function(e){
     loadQuestionsEditorFixed();
   }
 }, true);
+
+
+// L4.1 CENTRAL QUESTION BANK PRO
+let qbankCache = [];
+function qbVal(id){ return (document.getElementById(id)?.value || "").trim(); }
+function qbSet(id,v){ const e=document.getElementById(id); if(e) e.value = v ?? ""; }
+function qbNorm(v){ return String(v||"").toLowerCase().replace(/\s+/g," ").trim(); }
+function qbKey(subject, question){
+  const raw = qbNorm(subject+"|"+question);
+  let enc = btoa(unescape(encodeURIComponent(raw))).replace(/[^A-Za-z0-9]/g,"");
+  return "QB_" + enc.slice(0,120);
+}
+function qbDataFromForm(){
+  return {
+    subject: qbVal("qbSubject") || "General",
+    chapter: qbVal("qbChapter"),
+    topic: qbVal("qbTopic"),
+    difficulty: qbVal("qbDifficulty") || "Medium",
+    tags: qbVal("qbTags").split(",").map(x=>x.trim()).filter(Boolean),
+    language: qbVal("qbLanguage") || "Mixed",
+    q: qbVal("qbQuestion"),
+    o: [qbVal("qbA"), qbVal("qbB"), qbVal("qbC"), qbVal("qbD")],
+    a: Number(qbVal("qbAnswer") || 0),
+    marks: Number(qbVal("qbMarks") || 1),
+    negative: Number(qbVal("qbNegative") || 0),
+    explanation: qbVal("qbExplanation")
+  };
+}
+async function saveQBankQuestion(){
+  try{
+    const data = qbDataFromForm();
+    if(!data.subject || !data.q || data.o.some(x=>!x)) return alert("Subject, Question, A/B/C/D options required");
+    const id = qbKey(data.subject, data.q);
+    const old = await getDoc(doc(db,"questionBank",id));
+    if(old.exists() && !confirm("Similar question already exists. Update it?")) return;
+    await setDoc(doc(db,"questionBank",id), {...data, duplicateKey:id, usageCount:old.exists()?(old.data().usageCount||0):0, updatedAt:serverTimestamp()}, {merge:true});
+    alert("Question saved to Question Bank");
+    loadQBank();
+  }catch(e){ alert("Question Bank save failed: " + e.message); }
+}
+async function loadQBank(){
+  try{
+    const snap = await getDocs(collection(db,"questionBank"));
+    qbankCache = [];
+    snap.forEach(d=>qbankCache.push({id:d.id,...d.data()}));
+    const search = qbNorm(qbVal("qbSearch"));
+    const fsub = qbNorm(qbVal("qbFilterSubject"));
+    const fchap = qbNorm(qbVal("qbFilterChapter"));
+    const ftopic = qbNorm(qbVal("qbFilterTopic"));
+    const fdiff = qbVal("qbFilterDifficulty");
+    const rows = qbankCache.filter(x=>{
+      const hay = qbNorm([x.subject,x.chapter,x.topic,x.q,(x.o||[]).join(" "),(x.tags||[]).join(" "),x.explanation].join(" "));
+      if(search && !hay.includes(search)) return false;
+      if(fsub && qbNorm(x.subject) !== fsub) return false;
+      if(fchap && !qbNorm(x.chapter).includes(fchap)) return false;
+      if(ftopic && !qbNorm(x.topic).includes(ftopic)) return false;
+      if(fdiff && x.difficulty !== fdiff) return false;
+      return true;
+    });
+    renderQBank(rows);
+  }catch(e){ alert("Question Bank load failed: " + e.message); }
+}
+function renderQBank(rows){
+  const stats = $("qbankStats"), box = $("qbankBox");
+  if(stats){
+    const easy=rows.filter(x=>x.difficulty==="Easy").length, medium=rows.filter(x=>x.difficulty==="Medium").length, hard=rows.filter(x=>x.difficulty==="Hard").length;
+    const subjects=[...new Set(rows.map(x=>x.subject||"General"))].length;
+    stats.innerHTML = `<div class="stat"><div class="label">Questions</div><div class="value">${rows.length}</div></div><div class="stat"><div class="label">Subjects</div><div class="value">${subjects}</div></div><div class="stat"><div class="label">Easy</div><div class="value">${easy}</div></div><div class="stat"><div class="label">Medium</div><div class="value">${medium}</div></div><div class="stat"><div class="label">Hard</div><div class="value">${hard}</div></div>`;
+  }
+  if(!box) return;
+  if(!rows.length){ box.innerHTML = `<div class="notice">No questions found.</div>`; return; }
+  box.innerHTML = rows.map((x,i)=>{
+    const o=x.o||["","","",""];
+    return `<div class="qbank-card">
+      <h3>QB ${i+1}</h3>
+      <div class="qbank-meta">Subject: ${esc(x.subject||"General")} | Chapter: ${esc(x.chapter||"-")} | Topic: ${esc(x.topic||"-")} | Difficulty: ${esc(x.difficulty||"-")} | Used: ${x.usageCount||0}</div>
+      <div class="qbank-mini"><b>Q:</b> ${esc(x.q||"")}</div>
+      <div class="qbank-mini">A) ${esc(o[0]||"")}</div>
+      <div class="qbank-mini">B) ${esc(o[1]||"")}</div>
+      <div class="qbank-mini">C) ${esc(o[2]||"")}</div>
+      <div class="qbank-mini">D) ${esc(o[3]||"")}</div>
+      <div class="qbank-mini"><b>Answer:</b> ${"ABCD"[Number(x.a)||0]}</div>
+      ${x.explanation ? `<div class="qbank-mini"><b>Explanation:</b> ${esc(x.explanation)}</div>` : ""}
+      <div class="qbank-actions">
+        <button class="s" type="button" onclick="window.editQBank('${x.id}')">Edit</button>
+        <button class="g" type="button" onclick="window.addQBankToExam('${x.id}')">Add to Exam Textarea</button>
+      </div>
+    </div>`;
+  }).join("");
+}
+window.editQBank = function(id){
+  const x = qbankCache.find(q=>q.id===id);
+  if(!x) return alert("Question not found");
+  qbSet("qbSubject", x.subject); qbSet("qbChapter", x.chapter); qbSet("qbTopic", x.topic);
+  qbSet("qbDifficulty", x.difficulty); qbSet("qbTags", (x.tags||[]).join(","));
+  qbSet("qbLanguage", x.language || "Mixed"); qbSet("qbQuestion", x.q);
+  qbSet("qbA", (x.o||[])[0]); qbSet("qbB", (x.o||[])[1]); qbSet("qbC", (x.o||[])[2]); qbSet("qbD", (x.o||[])[3]);
+  qbSet("qbAnswer", String(Number(x.a)||0)); qbSet("qbMarks", String(x.marks||1)); qbSet("qbNegative", String(x.negative||0));
+  qbSet("qbExplanation", x.explanation || "");
+  window.scrollTo({top:0,behavior:"smooth"});
+  alert("Loaded into form. Edit and Save.");
+};
+window.addQBankToExam = function(id){
+  const x = qbankCache.find(q=>q.id===id);
+  if(!x) return alert("Question not found");
+  const bits = $("bits");
+  if(!bits) return alert("Exam textarea not found. Go to Exams tab first.");
+  const n = (bits.value.match(/^\d+\./gm)||[]).length + 1;
+  const o = x.o || ["","","",""];
+  bits.value += `\n${n}. ${x.q}\nA. ${o[0]||""}\nB. ${o[1]||""}\nC. ${o[2]||""}\nD. ${o[3]||""}\nAnswer: ${"ABCD"[Number(x.a)||0]}\n`;
+  alert("Question added to Exam textarea");
+};
+function clearQBankForm(){
+  ["qbSubject","qbChapter","qbTopic","qbTags","qbQuestion","qbA","qbB","qbC","qbD","qbExplanation"].forEach(id=>qbSet(id,""));
+  qbSet("qbDifficulty","Easy"); qbSet("qbLanguage","Telugu"); qbSet("qbAnswer","0"); qbSet("qbMarks","1"); qbSet("qbNegative","0.25");
+}
+function exportQBankCsv(){
+  const rows = ["Subject,Chapter,Topic,Difficulty,Question,A,B,C,D,Answer,Tags,Explanation"];
+  qbankCache.forEach(x=>{
+    const o=x.o||[];
+    rows.push([x.subject,x.chapter,x.topic,x.difficulty,x.q,o[0],o[1],o[2],o[3],"ABCD"[Number(x.a)||0],(x.tags||[]).join("|"),x.explanation].map(v=>`"${String(v||"").replaceAll('"','""')}"`).join(","));
+  });
+  csvDownload(rows.join("\n"), "question_bank.csv");
+}
+document.addEventListener("click", function(e){
+  if(!e.target) return;
+  if(e.target.id==="saveQBankBtn"){ e.preventDefault(); saveQBankQuestion(); }
+  if(e.target.id==="loadQBankBtn"){ e.preventDefault(); loadQBank(); }
+  if(e.target.id==="clearQBankBtn"){ e.preventDefault(); clearQBankForm(); }
+  if(e.target.id==="exportQBankCsvBtn"){ e.preventDefault(); exportQBankCsv(); }
+}, true);

@@ -17,3 +17,8 @@ table{width:100%;border-collapse:collapse;background:white;margin-top:12px}th,td
 
 .qedit-card{border-left:6px solid #0b57d0}
 .qedit-text{min-height:110px}
+
+.qbank-card{border:1px solid #dbe7ff;background:#f8fbff;border-radius:16px;padding:14px;margin:12px 0;border-left:6px solid #0b57d0}
+.qbank-meta{font-size:13px;color:#555;font-weight:900;margin:6px 0;line-height:1.5}
+.qbank-actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.qbank-mini{font-size:14px;line-height:1.5}
