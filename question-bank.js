@@ -1,2 +1,1 @@
-// KSR L4.0 module: question-bank
-export const VERSION = 'L4.0';
+export const QUESTION_BANK_MODULE='L4.6';

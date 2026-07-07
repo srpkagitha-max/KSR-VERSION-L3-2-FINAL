@@ -1,2 +1,1 @@
-// KSR L4.0 module: reports
-export const VERSION = 'L4.0';
+export const REPORTS_MODULE='L4.6';
