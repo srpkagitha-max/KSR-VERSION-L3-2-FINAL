@@ -59,7 +59,3 @@ table{width:100%;border-collapse:collapse;background:white;margin-top:12px}th,td
 .smart-edit{background:#fff;border:1px solid #dbe7ff;border-radius:14px;padding:12px;margin:10px 0}
 .smart-edit textarea{min-height:90px}
 .raw-box{white-space:pre-wrap;background:#111827;color:#fff;border-radius:10px;padding:10px;font-size:12px;max-height:170px;overflow:auto}
-
-.import-ready{background:#e6f4ea;border:1px solid #137333;border-left:6px solid #137333;border-radius:14px;padding:12px;margin:10px 0}
-.import-issue{background:#fff8db;border:1px solid #fbbc04;border-left:6px solid #fbbc04;border-radius:14px;padding:12px;margin:10px 0}
-.import-heading{background:#eef4ff;border:1px solid #cfe0ff;color:#0b57d0;border-radius:999px;padding:5px 10px;font-weight:900;display:inline-block;margin:3px}
