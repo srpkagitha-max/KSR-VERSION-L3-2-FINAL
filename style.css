@@ -33,3 +33,6 @@ table{width:100%;border-collapse:collapse;background:white;margin-top:12px}th,td
 .print-preview{font-family:Arial,serif;color:#111;background:white}
 .omr-bubble{display:inline-block;width:16px;height:16px;border:2px solid #111;border-radius:50%;margin:0 5px;vertical-align:middle}
 .print-note{background:#fff8db;border-left:6px solid #fbbc04;padding:12px;border-radius:12px;margin:12px 0}
+
+.print-pro-badge{display:inline-block;background:#e8f0fe;color:#0b57d0;border-radius:999px;padding:5px 10px;font-weight:900;font-size:12px}
+.print-tool-card{border-left:6px solid #0b57d0}

@@ -661,3 +661,64 @@ document.addEventListener("click", function(e){
   if(e.target.id==="generateOmrBtn"){ e.preventDefault(); generateOMR(); }
   if(e.target.id==="generateHallTicketAdminBtn"){ e.preventDefault(); generateAdminHallTicket(); }
 }, true);
+
+
+// L4.5 PROFESSIONAL PRINT PACK OVERRIDES
+function ksrPrintCss(){
+  return `<style>
+  body{font-family:Arial,'Noto Sans Telugu',sans-serif;background:#e5e7eb;margin:0;color:#111}
+  .page{width:210mm;min-height:297mm;margin:10px auto;background:white;padding:12mm;box-sizing:border-box;position:relative;overflow:hidden}
+  .wm{position:absolute;top:42%;left:12%;font-size:70px;font-weight:900;color:#000;opacity:.04;transform:rotate(-25deg);z-index:0;white-space:nowrap}
+  .content{position:relative;z-index:1}
+  .head{display:flex;align-items:center;gap:12px;border-bottom:3px solid #0b57d0;padding-bottom:10px;margin-bottom:12px}
+  .logo{width:62px;height:62px;object-fit:contain;border:1px solid #ddd;border-radius:8px}
+  .brand{font-size:24px;font-weight:900;color:#0b57d0}.sub{font-size:14px;font-weight:700;margin-top:3px}
+  .meta{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;border:1px solid #cbd5e1;border-radius:10px;padding:8px;margin:10px 0;font-size:12px}
+  .box{border:1px solid #cbd5e1;border-radius:10px;padding:8px}.lbl{font-size:10px;color:#555;font-weight:900;text-transform:uppercase}.val{font-size:13px;font-weight:800;margin-top:2px}
+  .inst{border-left:5px solid #fbbc04;background:#fff8db;border-radius:10px;padding:10px;margin:12px 0;font-size:12px;line-height:1.5}
+  .section{background:#eef4ff;border:1px solid #cfe0ff;border-radius:8px;padding:7px 10px;margin:14px 0 8px;font-weight:900;color:#0b57d0}
+  .q{margin:10px 0;page-break-inside:avoid;font-size:13px;line-height:1.45}.q b{font-size:14px}.opts{display:grid;grid-template-columns:1fr 1fr;gap:4px 12px;margin-top:6px}
+  .footer{position:absolute;bottom:7mm;left:12mm;right:12mm;border-top:1px solid #999;padding-top:4px;font-size:10px;display:flex;justify-content:space-between}
+  table{width:100%;border-collapse:collapse}td,th{border:1px solid #111;padding:5px;font-size:12px;text-align:left}th{background:#eef4ff}
+  .omr-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px 10px}.omr-row{display:flex;align-items:center;gap:4px;font-size:11px;margin:3px 0}.bubble{display:inline-block;width:13px;height:13px;border:1.8px solid #111;border-radius:50%;margin:0 2px}
+  .sign{display:flex;justify-content:space-between;margin-top:22px;font-size:12px}
+  .noprint{text-align:center;margin:18px}.noprint button{padding:12px 22px;font-weight:900;border:0;border-radius:10px;background:#0b57d0;color:white}
+  @media print{body{background:white}.page{margin:0;width:auto;min-height:297mm}.noprint{display:none}.page{page-break-after:always}}
+  </style>`;
+}
+function ksrOpenPrintPro(title, bodyHtml){
+  const w=window.open("","_blank");
+  w.document.write(`<!DOCTYPE html><html><head><title>${htmlEsc(title)}</title><meta name="viewport" content="width=device-width,initial-scale=1">${ksrPrintCss()}</head><body>${bodyHtml}<div class="noprint"><button onclick="print()">Print / Save PDF</button></div></body></html>`);
+  w.document.close();
+}
+function ksrLogoHtml(){
+  const logo = $("printLogoUrl")?.value?.trim() || "";
+  return logo ? `<img class="logo" src="${htmlEsc(logo)}">` : `<div class="logo" style="display:flex;align-items:center;justify-content:center;font-weight:900;color:#0b57d0">KSR</div>`;
+}
+async function generateQuestionPaperPro(){
+  try{
+    const id=safe($("printExamId").value); if(!id)return alert("Enter Exam ID");
+    const ex=await getExamForPrint(id), inst=$("printInstituteName").value||"KSR Online Exam Platform", wm=$("printWatermark")?.value||"KSR";
+    const showKey=$("printShowKey").value==="yes", showInst=$("printInstructions").value==="yes", qs=ex.questions||[];
+    let currentSub="", qhtml="";
+    qs.forEach((q,i)=>{
+      const sub=q.subject||"General", o=q.o||[];
+      if(sub!==currentSub){currentSub=sub;qhtml+=`<div class="section">${htmlEsc(sub)}</div>`}
+      qhtml+=`<div class="q"><b>${i+1}. ${htmlEsc(q.q)}</b><div class="opts"><div>A) ${htmlEsc(o[0]||"")}</div><div>B) ${htmlEsc(o[1]||"")}</div><div>C) ${htmlEsc(o[2]||"")}</div><div>D) ${htmlEsc(o[3]||"")}</div></div>${showKey?`<div><b>Answer:</b> ${"ABCD"[Number(q.a)||0]}</div>`:""}</div>`;
+    });
+    const instHtml=showInst?`<div class="inst"><b>Instructions:</b><br>1. Read all questions carefully. 2. Each question has four options. 3. Negative marking: ${ex.negativeOn?("Yes, -"+ex.negativeMark):"No"}. 4. Total Questions: ${qs.length}. Marks/Question: ${ex.marks||1}.</div>`:"";
+    const body=`<div class="page"><div class="wm">${htmlEsc(wm)}</div><div class="content"><div class="head">${ksrLogoHtml()}<div><div class="brand">${htmlEsc(inst)}</div><div class="sub">${htmlEsc(ex.title||id)} - ${htmlEsc($("printPaperType").value)}</div></div></div><div class="meta"><div class="box"><div class="lbl">Exam ID</div><div class="val">${id}</div></div><div class="box"><div class="lbl">Questions</div><div class="val">${qs.length}</div></div><div class="box"><div class="lbl">Date</div><div class="val">${new Date().toLocaleDateString()}</div></div></div>${instHtml}${qhtml}<div class="sign"><div>Student Signature _____________</div><div>Invigilator Signature _____________</div></div></div><div class="footer"><span>KSR Online Exam Platform</span><span>Generated: ${new Date().toLocaleString()}</span></div></div>`;
+    ksrOpenPrintPro("Question Paper "+id,body);
+  }catch(e){alert("Question paper failed: "+e.message)}
+}
+function generateOMRPro(){
+  const count=Number($("omrCount").value)||100, examId=safe($("omrExamId").value)||"-", hall=$("omrHallTicket").value||"", inst=$("omrInstituteName")?.value||"KSR Online Exam Platform", name=$("omrCandidateName")?.value||"";
+  let rows=""; for(let i=1;i<=count;i++){rows+=`<div class="omr-row"><b>${String(i).padStart(3,"0")}</b> A<span class="bubble"></span> B<span class="bubble"></span> C<span class="bubble"></span> D<span class="bubble"></span></div>`}
+  const body=`<div class="page"><div class="content"><div class="head"><div class="logo" style="display:flex;align-items:center;justify-content:center;font-weight:900;color:#0b57d0">KSR</div><div><div class="brand">${htmlEsc(inst)}</div><div class="sub">OMR Answer Sheet</div></div></div><div class="meta"><div class="box"><div class="lbl">Exam ID</div><div class="val">${examId}</div></div><div class="box"><div class="lbl">Hall Ticket</div><div class="val">${htmlEsc(hall)}</div></div><div class="box"><div class="lbl">Candidate</div><div class="val">${htmlEsc(name)||"________________"}</div></div></div><div class="inst">Fill bubbles clearly with black/blue pen. Do not overwrite. Total Questions: ${count}</div><div class="omr-grid">${rows}</div><div class="sign"><div>Student Signature _____________</div><div>Invigilator Signature _____________</div></div></div><div class="footer"><span>KSR OMR Sheet</span><span>${new Date().toLocaleDateString()}</span></div></div>`;
+  ksrOpenPrintPro("OMR Sheet "+examId,body);
+}
+document.addEventListener("click",function(e){
+  if(!e.target)return;
+  if(e.target.id==="generatePaperBtn"){e.preventDefault();e.stopImmediatePropagation();generateQuestionPaperPro();}
+  if(e.target.id==="generateOmrBtn"){e.preventDefault();e.stopImmediatePropagation();generateOMRPro();}
+},true);
