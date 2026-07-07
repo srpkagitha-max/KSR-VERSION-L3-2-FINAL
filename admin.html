@@ -1,8 +1,8 @@
 <!DOCTYPE html>
 <html lang="te">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR L4.3 Enterprise Admin</title><link rel="stylesheet" href="style.css?v=l43enterprise2"></head>
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR L4.4 PDF/OMR Admin</title><link rel="stylesheet" href="style.css?v=l44pdfomr1"></head>
 <body>
-<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L4.3 Enterprise Part-1</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
+<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L4.4 Enterprise Part-2 PDF OMR</div></div><a style="color:white;font-weight:900" href="index.html">Student Page</a></div></div>
 <div class="wrap">
   <div id="loginCard" class="card">
     <h2>Admin Login</h2>
@@ -10,7 +10,7 @@
     <button class="p" id="loginBtn" type="button">Login</button><p id="loginMsg" class="small"></p>
   </div>
   <div id="app" class="hide">
-    <div class="card top"><h2>Dashboard <span class="badge">L4.3 Enterprise</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
+    <div class="card top"><h2>Dashboard <span class="badge">L4.4 PDF/OMR</span></h2><button class="d" id="logoutBtn" type="button">Logout</button></div>
     <div class="layout">
       <div class="sidebar">
         <button class="sidebtn active" data-view="dashboard">📊 Dashboard</button>
@@ -20,6 +20,7 @@
         <button class="sidebtn" data-view="qbank">📚 Question Bank</button>
         <button class="sidebtn" data-view="students">👨‍🎓 Students</button>
         <button class="sidebtn" data-view="reports">📈 Reports</button>
+        <button class="sidebtn" data-view="printtools">🖨️ PDF / OMR Tools</button>
         <button class="sidebtn" data-view="settings">⚙️ Settings</button>
       </div>
       <main>
@@ -146,9 +147,55 @@
   <div id="qbankBox"></div>
 </section>
 
+      
+<section id="view-printtools" class="view card hide">
+  <h2>🖨️ PDF / OMR Tools</h2>
+
+  <div class="exam-card">
+    <h3>📄 Question Paper PDF / Print</h3>
+    <div class="grid">
+      <div><label>Exam ID</label><input id="printExamId" placeholder="DSC001"></div>
+      <div><label>Institute Name</label><input id="printInstituteName" value="KSR Online Exam Platform"></div>
+    </div>
+    <div class="grid3">
+      <div><label>Show Answer Key</label><select id="printShowKey"><option value="no">No</option><option value="yes">Yes</option></select></div>
+      <div><label>Show Instructions</label><select id="printInstructions"><option value="yes">Yes</option><option value="no">No</option></select></div>
+      <div><label>Paper Type</label><select id="printPaperType"><option>A4 Question Paper</option><option>Practice Sheet</option><option>Mock Test</option></select></div>
+    </div>
+    <button class="p" id="generatePaperBtn" type="button">Generate Question Paper</button>
+    <button class="s" id="generateAnswerKeyBtn" type="button">Generate Answer Key</button>
+  </div>
+
+  <div class="exam-card">
+    <h3>📝 OMR Sheet Generator</h3>
+    <div class="grid3">
+      <div><label>Questions Count</label><select id="omrCount"><option>50</option><option selected>100</option><option>150</option></select></div>
+      <div><label>Exam ID</label><input id="omrExamId" placeholder="DSC001"></div>
+      <div><label>Hall Ticket No</label><input id="omrHallTicket" placeholder="Optional"></div>
+    </div>
+    <button class="o" id="generateOmrBtn" type="button">Generate OMR Sheet</button>
+  </div>
+
+  <div class="exam-card">
+    <h3>🎫 Hall Ticket PDF / Print</h3>
+    <div class="grid">
+      <input id="htName" placeholder="Student Name">
+      <input id="htPhone" placeholder="Phone">
+    </div>
+    <div class="grid">
+      <input id="htExamId" placeholder="Exam ID">
+      <input id="htCode" placeholder="Exam Code">
+    </div>
+    <input id="htPhoto" placeholder="Photo URL optional">
+    <button class="g" id="generateHallTicketAdminBtn" type="button">Generate Hall Ticket</button>
+  </div>
+
+  <div class="notice">Use browser Print → Save as PDF to download.</div>
+</section>
+
       </main>
     </div>
   </div>
 </div>
-<script type="module" src="admin.js?v=l43enterprise2"></script>
+<script type="module" src="admin.js?v=l44pdfomr1"></script>
 </body></html>

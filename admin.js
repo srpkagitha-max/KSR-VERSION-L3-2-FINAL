@@ -557,3 +557,107 @@ document.addEventListener("click",function(e){
   if(e.target.id==="exportQBankJsonBtn"){e.preventDefault();exportQBankJson()}
   if(e.target.id==="importQBankJsonBtn"){e.preventDefault();importQBankJson()}
 },true);
+
+
+// L4.4 ENTERPRISE PART-2 PDF OMR TOOLS
+function htmlEsc(v){ return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;"); }
+function openPrintWindow(title, bodyHtml){
+  const w = window.open("", "_blank");
+  w.document.write(`<!DOCTYPE html><html><head><title>${htmlEsc(title)}</title><meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+  body{font-family:Arial,'Noto Sans Telugu',sans-serif;background:#eee;margin:0;color:#111}
+  .page{width:210mm;min-height:297mm;margin:10px auto;background:white;padding:14mm;box-sizing:border-box}
+  .head{text-align:center;border-bottom:2px solid #111;padding-bottom:10px;margin-bottom:14px}
+  .brand{font-size:24px;font-weight:900}.sub{font-size:14px;margin-top:4px}
+  .meta{display:flex;justify-content:space-between;gap:10px;border:1px solid #999;padding:8px;margin:10px 0;font-size:13px}
+  .q{margin:12px 0;page-break-inside:avoid;font-size:14px;line-height:1.45}.q b{font-size:15px}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:6px}
+  .inst{border:1px solid #999;padding:10px;margin:12px 0;font-size:13px;line-height:1.5}
+  table{width:100%;border-collapse:collapse}td,th{border:1px solid #111;padding:5px;font-size:12px;text-align:left}
+  .omr-row{display:flex;align-items:center;gap:8px;margin:5px 0;font-size:12px}.bubble{display:inline-block;width:15px;height:15px;border:2px solid #111;border-radius:50%;margin:0 3px}.omr-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+  .sign{display:flex;justify-content:space-between;margin-top:30px}
+  @media print{body{background:white}.page{margin:0;width:auto;min-height:auto;box-shadow:none}.noprint{display:none}}
+  </style></head><body>${bodyHtml}<div class="noprint" style="text-align:center;margin:20px"><button onclick="print()" style="padding:12px 20px;font-weight:900">Print / Save PDF</button></div></body></html>`);
+  w.document.close();
+}
+async function getExamForPrint(id){
+  const d = await getDoc(doc(db,"exams",id));
+  if(!d.exists()) throw new Error("Exam not found");
+  return d.data();
+}
+async function generateQuestionPaper(){
+  try{
+    const id = safe($("printExamId").value);
+    if(!id) return alert("Enter Exam ID");
+    const ex = await getExamForPrint(id);
+    const inst = $("printInstituteName").value || "KSR Online Exam Platform";
+    const showKey = $("printShowKey").value === "yes";
+    const showInst = $("printInstructions").value === "yes";
+    const qs = ex.questions || [];
+    let qhtml = qs.map((q,i)=>{
+      const o=q.o||[];
+      return `<div class="q"><b>${i+1}. ${htmlEsc(q.q)}</b>
+      <div class="opts"><div>A) ${htmlEsc(o[0]||"")}</div><div>B) ${htmlEsc(o[1]||"")}</div><div>C) ${htmlEsc(o[2]||"")}</div><div>D) ${htmlEsc(o[3]||"")}</div></div>
+      ${showKey?`<div><b>Answer:</b> ${"ABCD"[Number(q.a)||0]}</div>`:""}</div>`;
+    }).join("");
+    const instHtml = showInst ? `<div class="inst"><b>Instructions:</b><br>1. Read all questions carefully.<br>2. Each question has four options A, B, C, D.<br>3. Negative marking: ${ex.negativeOn?("Yes, -"+ex.negativeMark):"No"}.<br>4. Total Questions: ${qs.length}. Marks/Question: ${ex.marks||1}.</div>` : "";
+    const body = `<div class="page"><div class="head"><div class="brand">${htmlEsc(inst)}</div><div class="sub">${htmlEsc(ex.title||id)} - ${htmlEsc($("printPaperType").value)}</div></div>
+    <div class="meta"><div><b>Exam ID:</b> ${id}</div><div><b>Total Questions:</b> ${qs.length}</div><div><b>Date:</b> ${new Date().toLocaleDateString()}</div></div>
+    ${instHtml}${qhtml}<div class="sign"><div>Student Signature</div><div>Invigilator Signature</div></div></div>`;
+    openPrintWindow("Question Paper "+id, body);
+  }catch(e){ alert("Question paper failed: "+e.message); }
+}
+async function generateAnswerKey(){
+  try{
+    const id = safe($("printExamId").value);
+    if(!id) return alert("Enter Exam ID");
+    const ex = await getExamForPrint(id);
+    const qs = ex.questions || [];
+    let rows = qs.map((q,i)=>`<tr><td>${i+1}</td><td>${"ABCD"[Number(q.a)||0]}</td><td>${htmlEsc(q.subject||"General")}</td></tr>`).join("");
+    const body = `<div class="page"><div class="head"><div class="brand">Answer Key</div><div class="sub">${htmlEsc(ex.title||id)} (${id})</div></div><table><tr><th>Q.No</th><th>Answer</th><th>Subject</th></tr>${rows}</table></div>`;
+    openPrintWindow("Answer Key "+id, body);
+  }catch(e){ alert("Answer key failed: "+e.message); }
+}
+function generateOMR(){
+  const count = Number($("omrCount").value)||100;
+  const examId = safe($("omrExamId").value)||"-";
+  const hall = $("omrHallTicket").value || "";
+  let rows = "";
+  for(let i=1;i<=count;i++){
+    rows += `<div class="omr-row"><b>${String(i).padStart(3,"0")}</b> <span>A</span><span class="bubble"></span> <span>B</span><span class="bubble"></span> <span>C</span><span class="bubble"></span> <span>D</span><span class="bubble"></span></div>`;
+  }
+  const body = `<div class="page"><div class="head"><div class="brand">KSR OMR Answer Sheet</div><div class="sub">Exam ID: ${examId}</div></div>
+  <div class="meta"><div><b>Hall Ticket:</b> ${htmlEsc(hall)}</div><div><b>Name:</b> __________________</div><div><b>Phone:</b> __________________</div></div>
+  <div class="inst">Fill bubbles clearly with black/blue pen. Do not overwrite. Total Questions: ${count}</div>
+  <div class="omr-grid">${rows}</div>
+  <div class="sign"><div>Student Signature</div><div>Invigilator Signature</div></div></div>`;
+  openPrintWindow("OMR Sheet "+examId, body);
+}
+async function generateAdminHallTicket(){
+  const name = $("htName").value.trim() || "Student";
+  const ph = $("htPhone").value.trim() || "-";
+  const exId = safe($("htExamId").value) || "-";
+  const exCode = safe($("htCode").value) || "-";
+  const photo = $("htPhoto").value.trim();
+  let title="-", st="-", en="-";
+  try{
+    const d=await getDoc(doc(db,"exams",exId));
+    if(d.exists()){const e=d.data();title=e.title||exId;if(e.startTime)st=new Date(e.startTime).toLocaleString();if(e.endTime)en=new Date(e.endTime).toLocaleString();}
+  }catch(e){}
+  const vid="KSR-VFY-"+exId+"-"+(ph.replace(/\D/g,"").slice(-4)||"0000")+"-"+Date.now().toString().slice(-6);
+  const hall="KSR-"+exId+"-"+(ph.replace(/\D/g,"").slice(-4)||"0000")+"-"+Date.now().toString().slice(-5);
+  const qr="https://api.qrserver.com/v1/create-qr-code/?size=170x170&data="+encodeURIComponent(`KSR Hall Ticket\nName:${name}\nPhone:${ph}\nExam:${exId}\nCode:${exCode}\nVerify:${vid}`);
+  const photoHtml=photo?`<img src="${htmlEsc(photo)}" style="width:110px;height:130px;object-fit:cover;border:2px solid #0b57d0;border-radius:10px">`:`<div style="width:110px;height:130px;border:2px dashed #999;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:900">PHOTO</div>`;
+  const body = `<div class="page"><div class="head"><div class="brand">KSR Online Exam Platform</div><div class="sub">Hall Ticket</div></div>
+  <div style="display:flex;justify-content:space-between;align-items:center;margin:15px 0">${photoHtml}<div style="text-align:center"><img src="${qr}"><br><b>Scan to Verify</b></div></div>
+  <table><tr><th>Hall Ticket No</th><td>${hall}</td></tr><tr><th>Verification ID</th><td>${vid}</td></tr><tr><th>Student Name</th><td>${htmlEsc(name)}</td></tr><tr><th>Phone</th><td>${htmlEsc(ph)}</td></tr><tr><th>Exam Title</th><td>${htmlEsc(title)}</td></tr><tr><th>Exam ID</th><td>${exId}</td></tr><tr><th>Exam Code</th><td>${exCode}</td></tr><tr><th>Start Time</th><td>${st}</td></tr><tr><th>End Time</th><td>${en}</td></tr></table>
+  <div class="inst"><b>Instructions:</b><br>1. Carry this hall ticket.<br>2. Do not refresh/close browser during exam.<br>3. Submit before time ends.</div><div class="sign"><div>Student Signature</div><div>Invigilator Signature</div></div></div>`;
+  openPrintWindow("Hall Ticket "+name, body);
+}
+document.addEventListener("click", function(e){
+  if(!e.target) return;
+  if(e.target.id==="generatePaperBtn"){ e.preventDefault(); generateQuestionPaper(); }
+  if(e.target.id==="generateAnswerKeyBtn"){ e.preventDefault(); generateAnswerKey(); }
+  if(e.target.id==="generateOmrBtn"){ e.preventDefault(); generateOMR(); }
+  if(e.target.id==="generateHallTicketAdminBtn"){ e.preventDefault(); generateAdminHallTicket(); }
+}, true);
