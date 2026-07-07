@@ -1049,3 +1049,201 @@ document.addEventListener("click",function(e){
     ksrRenderBitsPreview();
   }
 },true);
+
+
+// L5.1 SMART PREVIEW + MISSING FIX ENGINE
+window.KSR_PREVIEW_QS = window.KSR_PREVIEW_QS || [];
+window.KSR_MISSING_BLOCKS = window.KSR_MISSING_BLOCKS || [];
+
+function ksrSpEsc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll('"',"&quot;")}
+function ksrSpClean(txt){
+  return String(txt||"")
+    .replace(/\r/g,"\n")
+    .replace(/[“”]/g,'"').replace(/[‘’]/g,"'")
+    .replace(/జవాబు\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/సమాధానం\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/Ans(?:wer)?\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/Answer\s*[:：\-]?\s*/gi,"\nAnswer: ");
+}
+function ksrPrettyQuestionText(q){
+  return String(q||"")
+    .replace(/\s*(\([ivxlcdm]+\)|[ivxlcdm]+\.)\s*/gi,"\n$1 ")
+    .replace(/\s*(\([0-9]+\))\s*/g,"\n$1 ")
+    .replace(/\n{2,}/g,"\n")
+    .trim();
+}
+function ksrFormatStatementsHtml(q){
+  const txt=ksrPrettyQuestionText(q);
+  const parts=txt.split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  if(parts.length<=1) return ksrSpEsc(txt);
+  return parts.map((p,i)=> i===0 && !/^(\([ivxlcdm0-9]+\)|[ivxlcdm]+\.)/i.test(p) ? ksrSpEsc(p) : `<span class="smart-statement">${ksrSpEsc(p)}</span>`).join("");
+}
+function ksrDetectExpectedCount(raw){
+  const nums=[...String(raw||"").matchAll(/(?:^|\n)\s*(\d+)[\.\)]\s+/g)].map(m=>Number(m[1])).filter(n=>n>0&&n<=300);
+  if(!nums.length) return 0;
+  return Math.max(...nums);
+}
+function ksrBlockify(raw){
+  raw=ksrSpClean(raw);
+  const lines=raw.split("\n").map(x=>x.trim()).filter(Boolean);
+  const blocks=[]; let cur=[];
+  for(const line of lines){
+    if(/^\d+[\.\)]\s+/.test(line) && cur.length){blocks.push(cur);cur=[];}
+    cur.push(line);
+  }
+  if(cur.length) blocks.push(cur);
+  return blocks;
+}
+function ksrReasonForBlock(block){
+  const text=block.join("\n");
+  const hasQ=/^\d+[\.\)]\s+/m.test(text);
+  const optCount=(text.match(/(^|\n)\s*[ABCD]\s*[\.\)\-:]/gi)||[]).length;
+  const hasAns=/Answer\s*[:：]?\s*[ABCD]/i.test(text);
+  const reasons=[];
+  if(!hasQ) reasons.push("Question number missing");
+  if(optCount<4) reasons.push("A/B/C/D options incomplete ("+optCount+"/4)");
+  if(!hasAns) reasons.push("Answer missing");
+  if(!reasons.length) reasons.push("Unknown format issue");
+  return reasons.join(", ");
+}
+function ksrParseSmart(raw){
+  const parser = (typeof ksrParseQuestionsUltra==="function") ? ksrParseQuestionsUltra :
+                 (typeof ksrParseQuestionsFull==="function") ? ksrParseQuestionsFull :
+                 (typeof parseBits==="function") ? parseBits : null;
+  let qs = parser ? parser(raw) : [];
+  qs = (qs||[]).map(q=>({q:ksrPrettyQuestionText(q.q),o:(q.o||["","","",""]).slice(0,4),a:Number(q.a)||0,subject:q.subject||"General"}));
+
+  const blocks=ksrBlockify(raw);
+  const missing=[];
+  blocks.forEach((b,idx)=>{
+    const qno=(b.join(" ").match(/^(\d+)[\.\)]/)||[])[1] || (idx+1);
+    const qText=b.join(" ");
+    const matched=qs.some(q=>{
+      const first=String(q.q||"").slice(0,30).replace(/\s/g,"");
+      return first && qText.replace(/\s/g,"").includes(first);
+    });
+    const optCount=(qText.match(/(^|\n)\s*[ABCD]\s*[\.\)\-:]/gi)||[]).length;
+    if(!matched || optCount<4){
+      missing.push({qno, reason:ksrReasonForBlock(b), raw:b.join("\n")});
+    }
+  });
+
+  const expected=ksrDetectExpectedCount(raw);
+  const numbers=[...String(raw||"").matchAll(/(?:^|\n)\s*(\d+)[\.\)]\s+/g)].map(m=>Number(m[1]));
+  if(numbers.length){
+    for(let n=1;n<=Math.max(...numbers);n++){
+      if(!numbers.includes(n)) missing.push({qno:n, reason:"Question number sequence missing", raw:""});
+    }
+  }
+  return {qs,missing,expected};
+}
+function ksrSyncPreviewToTextarea(){
+  const text = (window.KSR_PREVIEW_QS||[]).map((q,i)=>{
+    const o=q.o||["","","",""];
+    return `${i+1}. ${q.q}
+A. ${o[0]||""}
+B. ${o[1]||""}
+C. ${o[2]||""}
+D. ${o[3]||""}
+Answer: ${"ABCD"[Number(q.a)||0]}`;
+  }).join("\n\n");
+  const bits=document.getElementById("bits");
+  if(bits) bits.value=text;
+}
+function ksrRenderSmartPreview(){
+  const box=document.getElementById("bitsPreviewBox"), bits=document.getElementById("bits");
+  if(!box||!bits)return;
+  const {qs,missing,expected}=ksrParseSmart(bits.value||"");
+  window.KSR_PREVIEW_QS=qs; window.KSR_MISSING_BLOCKS=missing;
+  const missingCount=missing.length;
+  const status = missingCount ? `<div class="smart-bad"><b>⚠️ Issues Found:</b> ${missingCount}. Missing/problem blocks ni below fix cheyyandi.</div>` : `<div class="smart-warn" style="border-left-color:#137333;background:#e6f4ea"><b>✅ Ready:</b> Questions save cheyyadaniki ready.</div>`;
+  box.innerHTML=`<div class="smart-preview-panel">
+    <h2>👀 Smart Questions Preview</h2>
+    <div class="stat-grid">
+      <div class="stat"><div class="label">Expected</div><div class="value">${expected||qs.length}</div></div>
+      <div class="stat"><div class="label">Detected</div><div class="value">${qs.length}</div></div>
+      <div class="stat"><div class="label">Issues</div><div class="value">${missingCount}</div></div>
+      <div class="stat"><div class="label">Limit</div><div class="value">200</div></div>
+    </div>
+    ${qs.length>200?`<div class="smart-bad">⚠️ 200 questions limit exceed ayindi. Current: ${qs.length}</div>`:""}
+    ${status}
+    <div class="smart-actions">
+      <button class="p" type="button" onclick="ksrSavePreviewAndSave()">✅ Save Preview Questions</button>
+      <button class="g" type="button" onclick="ksrAddQuestionForm()">➕ Add Question</button>
+      <button class="s" type="button" onclick="ksrRenderSmartPreview()">🔄 Recheck</button>
+      <button class="s" type="button" onclick="document.getElementById('bitsPreviewBox').innerHTML=''">Close</button>
+    </div>
+    <div id="smartAddBox"></div>
+    ${missingCount?`<h3>🔎 Missing / Problem Questions</h3>${missing.map((m,i)=>`<div class="smart-bad">
+      <b>Problem Block ${i+1} ${m.qno?`(Q${m.qno})`:""}</b><br>
+      <b>Reason:</b> ${ksrSpEsc(m.reason)}
+      ${m.raw?`<div class="raw-box">${ksrSpEsc(m.raw)}</div>`:""}
+      <button class="g" type="button" onclick="ksrFixMissing(${i})">Fix & Add This Question</button>
+    </div>`).join("")}`:""}
+    <h3>📄 Detected Questions</h3>
+    <div id="smartQList">${qs.map((q,i)=>ksrQuestionCard(i,q)).join("")}</div>
+  </div>`;
+  box.scrollIntoView({behavior:"smooth",block:"start"});
+}
+function ksrQuestionCard(i,q){
+  const o=q.o||["","","",""], ans=Number(q.a)||0;
+  return `<div class="smart-q" id="smartQ${i}">
+    <h3>Q${i+1}. ${ksrFormatStatementsHtml(q.q||"")}</h3>
+    ${[0,1,2,3].map(n=>`<div class="smart-opt ${ans===n?'smart-correct':''}">${"ABCD"[n]}) ${ksrSpEsc(o[n]||"")}</div>`).join("")}
+    <b>Answer: ${"ABCD"[ans]}</b> <span class="pill">${ksrSpEsc(q.subject||"General")}</span>
+    <div class="smart-actions">
+      <button class="s" type="button" onclick="ksrEditQuestion(${i})">✏️ Edit</button>
+      <button class="d" type="button" onclick="ksrDeleteQuestion(${i})">🗑 Delete</button>
+      <button class="s" type="button" onclick="ksrMoveQuestion(${i},-1)">⬆</button>
+      <button class="s" type="button" onclick="ksrMoveQuestion(${i},1)">⬇</button>
+    </div>
+  </div>`;
+}
+function ksrEditQuestion(i){
+  const q=window.KSR_PREVIEW_QS[i], o=q.o||["","","",""];
+  const el=document.getElementById("smartQ"+i);
+  el.innerHTML=`<div class="smart-edit">
+    <h3>✏️ Edit Q${i+1}</h3>
+    <label>Question</label><textarea id="editQ${i}">${ksrSpEsc(q.q)}</textarea>
+    <label>A</label><input id="editA${i}" value="${ksrSpEsc(o[0]||"")}">
+    <label>B</label><input id="editB${i}" value="${ksrSpEsc(o[1]||"")}">
+    <label>C</label><input id="editC${i}" value="${ksrSpEsc(o[2]||"")}">
+    <label>D</label><input id="editD${i}" value="${ksrSpEsc(o[3]||"")}">
+    <label>Answer</label><select id="editAns${i}">${["A","B","C","D"].map((x,n)=>`<option value="${n}" ${Number(q.a)===n?"selected":""}>${x}</option>`).join("")}</select>
+    <div class="smart-actions"><button class="p" type="button" onclick="ksrApplyEdit(${i})">Save Edit</button><button class="s" type="button" onclick="ksrRenderSmartPreview()">Cancel</button></div>
+  </div>`;
+}
+function ksrApplyEdit(i){
+  window.KSR_PREVIEW_QS[i]={q:document.getElementById("editQ"+i).value,o:[0,1,2,3].map(n=>document.getElementById("edit"+"ABCD"[n]+i).value),a:Number(document.getElementById("editAns"+i).value),subject:(window.KSR_PREVIEW_QS[i].subject||"General")};
+  ksrSyncPreviewToTextarea(); ksrRenderSmartPreview();
+}
+function ksrDeleteQuestion(i){ if(confirm("Delete Q"+(i+1)+"?")){window.KSR_PREVIEW_QS.splice(i,1);ksrSyncPreviewToTextarea();ksrRenderSmartPreview();}}
+function ksrMoveQuestion(i,dir){const j=i+dir;if(j<0||j>=window.KSR_PREVIEW_QS.length)return;[window.KSR_PREVIEW_QS[i],window.KSR_PREVIEW_QS[j]]=[window.KSR_PREVIEW_QS[j],window.KSR_PREVIEW_QS[i]];ksrSyncPreviewToTextarea();ksrRenderSmartPreview();}
+function ksrAddQuestionForm(raw=""){
+  const box=document.getElementById("smartAddBox"); if(!box)return;
+  box.innerHTML=`<div class="smart-edit">
+    <h3>➕ Add Question</h3>
+    ${raw?`<div class="raw-box">${ksrSpEsc(raw)}</div>`:""}
+    <label>Question</label><textarea id="addQ">${raw?ksrSpEsc(raw.split("\n")[0]||""):""}</textarea>
+    <label>A</label><input id="addA"><label>B</label><input id="addB"><label>C</label><input id="addC"><label>D</label><input id="addD">
+    <label>Answer</label><select id="addAns"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select>
+    <div class="smart-actions"><button class="p" type="button" onclick="ksrApplyAdd()">Add to Preview</button><button class="s" type="button" onclick="document.getElementById('smartAddBox').innerHTML=''">Cancel</button></div>
+  </div>`;
+  box.scrollIntoView({behavior:"smooth",block:"start"});
+}
+function ksrFixMissing(i){ const m=window.KSR_MISSING_BLOCKS[i]; ksrAddQuestionForm(m?m.raw:""); }
+function ksrApplyAdd(){
+  const q=document.getElementById("addQ").value.trim();
+  const o=["addA","addB","addC","addD"].map(id=>document.getElementById(id).value.trim());
+  if(!q||!o.some(Boolean)) return alert("Question and options required");
+  window.KSR_PREVIEW_QS.push({q,o:o.map((x,i)=>x||("Option "+"ABCD"[i])),a:Number(document.getElementById("addAns").value),subject:"General"});
+  ksrSyncPreviewToTextarea(); ksrRenderSmartPreview();
+}
+function ksrSavePreviewAndSave(){
+  if((window.KSR_PREVIEW_QS||[]).length>200) return alert("200 questions limit. Please delete extra questions.");
+  ksrSyncPreviewToTextarea();
+  document.getElementById("saveExamBtn").click();
+}
+document.addEventListener("click",function(e){
+  if(e.target&&e.target.id==="previewBitsBtn"){e.preventDefault();e.stopPropagation();e.stopImmediatePropagation();ksrRenderSmartPreview();return false;}
+},true);
