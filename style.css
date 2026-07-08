@@ -28,3 +28,10 @@ button.p{background:#0b57d0;color:white}button.g{background:#137333;color:white}
 .preview-opt{padding:8px 10px;border-radius:9px;background:#f3f6fb;margin:5px 0}.preview-correct{background:#e6f4ea!important;border:1px solid #137333;font-weight:900}
 pre{white-space:pre-wrap;background:#0f172a;color:#fff;border-radius:14px;padding:14px;overflow:auto}
 @media(max-width:780px){.wrap{padding:10px}.layout{grid-template-columns:1fr}.grid,.grid3{grid-template-columns:1fr}.brand{font-size:24px}.card{padding:16px}.sidebar{position:static}.top{align-items:flex-start}.navlink{padding:9px 12px}}
+
+.pv2-panel{background:#f8fbff;border:1px solid #dbe7ff;border-radius:18px;padding:14px;margin:12px 0}
+.pv2-ready{background:#e6f4ea;border-left:6px solid #137333;border-radius:14px;padding:12px;margin:10px 0;font-weight:900}
+.pv2-issue{background:#fff8db;border-left:6px solid #fbbc04;border-radius:14px;padding:12px;margin:10px 0}.pv2-bad{background:#fce8e6;border-left:6px solid #d93025;border-radius:14px;padding:12px;margin:10px 0}
+.pv2-q{background:white;border:1px solid #e2e8f0;border-left:6px solid #0b57d0;border-radius:16px;padding:14px;margin:12px 0}.pv2-q h3{white-space:pre-wrap;line-height:1.55}
+.pv2-stmt{display:block;margin:6px 0;padding:8px 10px;background:#f6f8fb;border-radius:10px}.pv2-opt{padding:8px 10px;border-radius:9px;background:#f3f6fb;margin:5px 0}
+.pv2-correct{background:#e6f4ea!important;border:1px solid #137333;font-weight:900}.pv2-actions{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}.pv2-edit{background:#fff;border:1px solid #dbe7ff;border-radius:14px;padding:12px;margin:10px 0}

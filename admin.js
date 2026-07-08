@@ -42,3 +42,45 @@ function openPrint(html){const w=open("","_blank");w.document.write(`<html><head
 $("generatePaperBtn").onclick=async()=>{const id=safe($("printExamId").value);const d=await getDoc(doc(db,"exams",id));if(!d.exists())return alert("Exam not found");const qs=d.data().questions||[];openPrint(`<h1>${esc(d.data().title||id)}</h1>`+qs.map((q,i)=>`<div class=q><b>${i+1}. ${esc(q.q)}</b>${q.o.map((x,n)=>`<div class=opt>${"ABCD"[n]}) ${esc(x)}</div>`).join("")}</div>`).join(""))}
 $("generateAnswerKeyBtn").onclick=async()=>{const id=safe($("printExamId").value);const d=await getDoc(doc(db,"exams",id));if(!d.exists())return alert("Exam not found");const qs=d.data().questions||[];openPrint(`<h1>Answer Key</h1>`+qs.map((q,i)=>`<p>${i+1}. ${"ABCD"[q.a||0]}</p>`).join(""))}
 $("generateOmrBtn").onclick=()=>{const c=Number($("omrCount").value)||100;let h="<h1>OMR Sheet</h1>";for(let i=1;i<=c;i++)h+=`<p>${i}. ○A ○B ○C ○D</p>`;openPrint(h)}
+
+
+// PARSER ENGINE V2 PREVIEW
+function pv2Parse(txt){
+ txt=String(txt||"").replace(/\r/g,"\n").replace(/జవాబు\s*[:：\-]?/gi,"\nAnswer: ").replace(/సమాధానం\s*[:：\-]?/gi,"\nAnswer: ").replace(/Ans(?:wer)?\s*[:：\-]?/gi,"\nAnswer: ").replace(/Answer\s*[:：\-]?/gi,"\nAnswer: ");
+ const lines=txt.split("\n").map(x=>x.trim()).filter(Boolean), qs=[]; let q="",o=["","","",""],a=null,sub="General",last=-1;
+ function pretty(s){return String(s||"").replace(/\s*(\([ivxlcdm]+\)|[ivxlcdm]+\.)\s*/gi,"\n$1 ").replace(/\s*(\([0-9]+\))\s*/g,"\n$1 ").trim()}
+ function push(){if(q&&o.some(Boolean)){let ai=a;if(ai===null){let bi=o.findIndex(x=>/[●⚫✔✓✅]/.test(x));ai=bi>=0?bi:0}o=o.map(x=>String(x||"").replace(/[●⚫✔✓✅]/g,"").trim());qs.push({q:pretty(q),o:o.map((x,i)=>x||("Option "+("ABCD"[i]))),a:Number(ai)||0,subject:sub})}q="";o=["","","",""];a=null;last=-1}
+ for(let line of lines){let m;
+  if(/^\*[^*]{2,80}\*$/.test(line)){sub=line.replace(/\*/g,"");continue}
+  if((m=line.match(/^Subject\s*[:：]\s*(.+)$/i))){sub=m[1];continue}
+  line=line.replace(/^[Qq]\s*(\d+)\s*[\.\)]?\s*/,(x,n)=>n+". ").replace(/^([ABCD])\s*[\)\:\-]\s*/i,(x,l)=>l.toUpperCase()+". ");
+  if((m=line.match(/^(\d+)[\.\)]\s*(.*)$/))){push();q=m[2]||"";continue}
+  if((m=line.match(/^([ABCD])\s*[\.\)]\s*(.*)$/i))){last="ABCD".indexOf(m[1].toUpperCase());o[last]=m[2]||"";continue}
+  if((m=line.match(/^Answer\s*[:：]?\s*([ABCD])/i))){a="ABCD".indexOf(m[1].toUpperCase());last=-1;continue}
+  if(last>=0)o[last]+=(o[last]?" ":"")+line;else q+=(q?" ":"")+line;
+ }
+ push();return qs.slice(0,200)
+}
+parseQuestions=pv2Parse;
+window.KSR_PV2_QS=[];
+function pv2Esc(v){return String(v??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")}
+function pv2Expected(raw){const nums=[...String(raw||"").matchAll(/(?:^|\n)\s*(?:Q\s*)?(\d+)[\.\)]\s+/gi)].map(m=>Number(m[1])).filter(n=>n>0&&n<=300);return nums.length?Math.max(...nums):0}
+function pv2QHtml(q){let txt=String(q||"");let parts=txt.split(/\n+/).map(x=>x.trim()).filter(Boolean);return parts.length<=1?pv2Esc(txt):parts.map((p,i)=>i===0?pv2Esc(p):`<span class="pv2-stmt">${pv2Esc(p)}</span>`).join("")}
+function pv2Sync(){document.getElementById("bits").value=(window.KSR_PV2_QS||[]).map((q,i)=>`${i+1}. ${q.q}\nA. ${q.o[0]||""}\nB. ${q.o[1]||""}\nC. ${q.o[2]||""}\nD. ${q.o[3]||""}\nAnswer: ${"ABCD"[Number(q.a)||0]}`).join("\n\n")}
+function pv2Preview(){
+ const raw=document.getElementById("bits").value||"", qs=pv2Parse(raw); window.KSR_PV2_QS=qs;
+ const expected=pv2Expected(raw)||qs.length, issues=[];
+ qs.forEach((q,i)=>{if(!q.q)issues.push(`Q${i+1}: Question missing`);if((q.o||[]).filter(Boolean).length<4)issues.push(`Q${i+1}: Options incomplete`)});
+ if(expected&&qs.length<expected)issues.push(`Expected ${expected}, detected ${qs.length}`);
+ const ready=qs.length>0&&issues.length===0&&qs.length<=200;
+ document.getElementById("bitsPreviewBox").innerHTML=`<div class="pv2-panel"><h3>👀 Parser Engine V2 Preview</h3><div class="stat-grid"><div class="stat"><div class="label">Expected</div><div class="value">${expected}</div></div><div class="stat"><div class="label">Detected</div><div class="value">${qs.length}</div></div><div class="stat"><div class="label">Issues</div><div class="value">${issues.length}</div></div><div class="stat"><div class="label">Limit</div><div class="value">200</div></div></div>${ready?'<div class="pv2-ready">✅ Ready to Save</div>':'<div class="pv2-issue">⚠️ Check required</div>'}${issues.length?'<div class="pv2-bad">'+issues.map(x=>`<div>${pv2Esc(x)}</div>`).join("")+'</div>':""}<div class="pv2-actions"><button class="p" type="button" onclick="pv2Save()">✅ Save Preview Questions</button><button class="g" type="button" onclick="pv2AddForm()">➕ Add Question</button><button class="s" type="button" onclick="pv2Sync();pv2Preview()">🤖 Auto Fix</button></div><div id="pv2AddBox"></div>${qs.map((q,i)=>pv2Card(i,q)).join("")}</div>`;
+ document.getElementById("bitsPreviewBox").scrollIntoView({behavior:"smooth",block:"start"});
+}
+function pv2Card(i,q){const o=q.o||["","","",""],a=Number(q.a)||0;return `<div class="pv2-q" id="pv2q${i}"><h3>Q${i+1}. ${pv2QHtml(q.q)}</h3>${[0,1,2,3].map(n=>`<div class="pv2-opt ${a===n?'pv2-correct':''}">${"ABCD"[n]}) ${pv2Esc(o[n]||"")}</div>`).join("")}<b>Answer: ${"ABCD"[a]}</b><div class="pv2-actions"><button class="s" onclick="pv2Edit(${i})">✏️ Edit</button><button class="d" onclick="pv2Delete(${i})">🗑 Delete</button></div></div>`}
+function pv2Edit(i){const q=window.KSR_PV2_QS[i],o=q.o;document.getElementById("pv2q"+i).innerHTML=`<div class="pv2-edit"><textarea id="eq${i}">${pv2Esc(q.q)}</textarea><input id="ea${i}" value="${pv2Esc(o[0])}"><input id="eb${i}" value="${pv2Esc(o[1])}"><input id="ec${i}" value="${pv2Esc(o[2])}"><input id="ed${i}" value="${pv2Esc(o[3])}"><select id="eans${i}">${[0,1,2,3].map(n=>`<option value="${n}" ${q.a==n?"selected":""}>${"ABCD"[n]}</option>`).join("")}</select><button class="p" onclick="pv2Apply(${i})">Save</button></div>`}
+function pv2Apply(i){window.KSR_PV2_QS[i]={q:document.getElementById("eq"+i).value,o:["ea","eb","ec","ed"].map(x=>document.getElementById(x+i).value),a:Number(document.getElementById("eans"+i).value),subject:"General"};pv2Sync();pv2Preview()}
+function pv2Delete(i){window.KSR_PV2_QS.splice(i,1);pv2Sync();pv2Preview()}
+function pv2AddForm(){document.getElementById("pv2AddBox").innerHTML=`<div class="pv2-edit"><textarea id="nq" placeholder="Question"></textarea><input id="na" placeholder="A"><input id="nb" placeholder="B"><input id="nc" placeholder="C"><input id="nd" placeholder="D"><select id="nans"><option value="0">A</option><option value="1">B</option><option value="2">C</option><option value="3">D</option></select><button class="p" onclick="pv2Add()">Add</button></div>`}
+function pv2Add(){window.KSR_PV2_QS.push({q:document.getElementById("nq").value,o:[document.getElementById("na").value,document.getElementById("nb").value,document.getElementById("nc").value,document.getElementById("nd").value],a:Number(document.getElementById("nans").value),subject:"General"});pv2Sync();pv2Preview()}
+function pv2Save(){pv2Sync();document.getElementById("saveExamBtn").click()}
+document.getElementById("previewBitsBtn").onclick=pv2Preview;
