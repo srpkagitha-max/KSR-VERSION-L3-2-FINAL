@@ -1,23 +1,33 @@
 <!DOCTYPE html>
 <html lang="te">
-<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>KSR L4.0 Enterprise Final</title><link rel="stylesheet" href="style.css?v=l51smartpreview1"></head>
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>KSR Online Exam Platform</title>
+<link rel="stylesheet" href="style.css?v=restorefull1">
+</head>
 <body>
-<div class="header"><div class="wrap top"><div><div class="brand">KSR Online Exam Platform</div><div class="sub">Version L5.1 Smart Preview Engine</div></div><a style="color:white;font-weight:900" href="admin.html">Admin</a></div></div>
+<div class="header"><div class="wrap top">
+  <div><div class="brand">KSR Online Exam Platform</div><div class="sub">Student Page</div></div>
+  <a class="navlink" href="admin.html">Admin</a>
+</div></div>
 <div class="wrap">
-  <div id="login" class="card">
+  <div id="loginCard" class="card">
     <h2>Student Login</h2>
-    <div class="grid"><div><label>Name</label><input id="stName" placeholder="Student name"></div><div><label>Phone</label><input id="stPhone" placeholder="Phone number"></div></div>
-    <label>Student Photo URL (optional)</label><input id="stPhoto" placeholder="Paste photo link optional">
-    <div class="grid"><div><label>Exam ID</label><input id="stExamId" value="DSC001"></div><div><label>Exam Code</label><input id="stCode" placeholder="Exam code"></div></div>
-    <button class="p" id="startBtn">Start Exam</button><button class="s" id="hallBtn">Hall Ticket</button><p id="loginMsg" class="small"></p>
+    <label>Name</label><input id="name" placeholder="Student name">
+    <label>Phone</label><input id="phone" placeholder="Phone number">
+    <label>Student Photo URL (optional)</label><input id="photo" placeholder="Paste photo link optional">
+    <label>Exam ID</label><input id="examId" value="DSC001">
+    <label>Exam Code</label><input id="code" placeholder="Exam code">
+    <button class="p" id="startBtn">Start Exam</button><button class="s" id="hallBtn">Hall Ticket</button>
+    <p id="msg"></p>
   </div>
-  <div id="exam" class="hide">
-    <div class="card top"><div><b id="examTitle"></b><br><span id="prog" class="small"></span></div><span id="timer" class="timer">00:00</span></div>
-    <div class="card" id="qcard"></div>
-    <div class="card top"><button class="s" id="prevBtn">Previous</button><button class="o" id="markBtn">Mark</button><button class="p" id="nextBtn">Next</button><button class="d" id="submitBtn">Submit</button></div>
-    <div class="card"><b>Palette</b><div id="palette" class="pal"></div></div>
+  <div id="exam" class="card hide">
+    <div class="top"><h2 id="examTitle">Exam</h2><h2 id="timer">00:00</h2></div>
+    <div id="qBox"></div>
+    <div><button class="s" id="prevBtn">Previous</button><button class="s" id="markBtn">Mark</button><button class="s" id="nextBtn">Next</button><button class="p" id="submitBtn">Submit</button></div>
+    <h3>Palette</h3><div id="palette"></div>
   </div>
-  <div id="result" class="card result-card hide"></div>
+  <div id="result" class="card hide"></div>
 </div>
-<script type="module" src="student.js?v=l51smartpreview1"></script>
+<script type="module" src="student.js?v=restorefull1"></script>
 </body></html>
