@@ -13,6 +13,113 @@ $("loginBtn").onclick=async()=>{try{await signInWithEmailAndPassword(auth,$("ema
 $("logoutBtn").onclick=async()=>{try{await signOut(auth)}catch(e){} showLogin()};
 onAuthStateChanged(auth,u=>{if(u)showApp()});
 
+
+function prettyQ(q){
+  return String(q||"")
+    .replace(/\s*(\([ivxlcdm]+\)|[ivxlcdm]+\.)\s*/gi,"\n$1 ")
+    .replace(/\s*(\([0-9]+\))\s*/g,"\n$1 ")
+    .replace(/\s+(I{1,3}|IV|V)\.\s+/g,"\n$1. ")
+    .replace(/\n{2,}/g,"\n")
+    .trim()
+}
+function qHtml(q){
+  const p=prettyQ(q).split(/\n+/).map(x=>x.trim()).filter(Boolean);
+  return p.length<=1?esc(p[0]||""):p.map((x,i)=>i===0?esc(x):`<span class="pv3-stmt">${esc(x)}</span>`).join("")
+}
+function normalizeText(raw){
+  let t=String(raw||"")
+    .replace(/\r/g,"\n")
+    .replace(/[“”]/g,'"')
+    .replace(/[‘’]/g,"'")
+    .replace(/జవాబు\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/సమాధానం\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/Ans(?:wer)?\s*[:：\-]?\s*/gi,"\nAnswer: ")
+    .replace(/Answer\s*[:：\-]?\s*/gi,"\nAnswer: ");
+  // force options into separate lines
+  t=t.replace(/\s+([ABCD])\s*[\)\.\:\-]\s+/g,"\n$1. ");
+  t=t.replace(/(^|\n)\s*([ABCD])\s*[\)\:\-]\s*/gi,(m,b,a)=>`${b}${a.toUpperCase()}. `);
+  // force Q numbers into separate lines even if pasted continuously
+  t=t.replace(/(^|\n)\s*(Q\s*)?(\d+)\s*[\.\)]\s*/gi,(m,b,q,n)=>`${b}${n}. `);
+  return t.replace(/\n{3,}/g,"\n\n").trim()
+}
+function splitQuestionBlocks(text){
+  const lines=text.split("\n").map(x=>x.trim()).filter(Boolean);
+  const blocks=[];
+  let current=[];
+  for(const line of lines){
+    if(/^\d+\s*[\.\)]/.test(line)){
+      if(current.length) blocks.push(current);
+      current=[line];
+    }else{
+      if(current.length) current.push(line);
+      else current=[line];
+    }
+  }
+  if(current.length) blocks.push(current);
+  return blocks;
+}
+function parseQuestionBlock(lines, subject){
+  let text=lines.join("\n").trim();
+  let ans=null;
+  const am=text.match(/Answer\s*[:：]?\s*([ABCD])/i);
+  if(am) ans="ABCD".indexOf(am[1].toUpperCase());
+  text=text.replace(/^Answer\s*[:：]?\s*[ABCD].*$/gim,"").trim();
+
+  const optRegex=/^\s*([ABCD])\s*[\.\)\:\-]\s*(.*)$/gmi;
+  const matches=[...text.matchAll(optRegex)];
+  if(matches.length<2) return null;
+
+  const opts=["","","",""];
+  let firstOptIndex=matches[0].index ?? 0;
+
+  for(let i=0;i<matches.length;i++){
+    const m=matches[i];
+    const letter=m[1].toUpperCase();
+    const idx="ABCD".indexOf(letter);
+    const start=(m.index ?? 0)+m[0].length-(m[2]||"").length;
+    const end=i+1<matches.length ? (matches[i+1].index ?? text.length) : text.length;
+    let val=text.slice(start,end).trim();
+    if(ans===null && /[●⚫✔✓✅*]/.test(val)) ans=idx;
+    val=val.replace(/[●⚫✔✓✅*]/g,"").trim();
+    opts[idx]=val;
+  }
+
+  let q=text.slice(0,firstOptIndex).trim();
+  q=q.replace(/^\d+\s*[\.\)]\s*/,"").trim();
+  if(!q) return null;
+
+  return {
+    q: prettyQ(q),
+    o: opts.map((x,i)=>x||("Option "+("ABCD"[i]))),
+    a: ans===null?0:ans,
+    subject: subject||"General"
+  }
+}
+function parseQuestions(raw){
+  const text=normalizeText(raw);
+  let subject="General";
+  const qs=[];
+  for(const block0 of splitQuestionBlocks(text)){
+    const block=[];
+    for(const line of block0){
+      const clean=line.replace(/\*/g,"").trim();
+      if(/^\*[^*]{2,80}\*$/.test(line)){subject=clean||subject;continue}
+      if(/^Subject\s*[:：]\s*/i.test(line)){subject=line.replace(/^Subject\s*[:：]\s*/i,"").trim()||subject;continue}
+      if(/^(EVS|App\s+Exam|App\s+GK|App\s+PIE|Psychology|Telugu|English|GK|General)$/i.test(clean)){subject=clean;continue}
+      block.push(line);
+    }
+    const q=parseQuestionBlock(block,subject);
+    if(q) qs.push(q);
+  }
+  return qs.slice(0,200)
+}
+function expectedCount(raw){
+  const nums=[...normalizeText(raw).matchAll(/(?:^|\n)\s*(\d+)\s*[\.\)]\s+/g)]
+    .map(m=>Number(m[1])).filter(n=>n>0&&n<=300);
+  return nums.length?Math.max(...nums):0
+}
+
+
 document.querySelectorAll(".sidebtn").forEach(b=>b.onclick=()=>{document.querySelectorAll(".sidebtn").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".view").forEach(v=>v.classList.add("hide"));$("view-"+b.dataset.view).classList.remove("hide")});
 
 function prettyQ(q){return String(q||"").replace(/\s*(\([ivxlcdm]+\)|[ivxlcdm]+\.)\s*/gi,"\n$1 ").replace(/\s*(\([0-9]+\))\s*/g,"\n$1 ").replace(/\s+(I{1,3}|IV|V)\.\s+/g,"\n$1. ").replace(/\n{2,}/g,"\n").trim()}
@@ -25,7 +132,7 @@ function expectedCount(raw){const nums=[...String(raw||"").matchAll(/(?:^|\n)\s*
 
 window.KSR_PREVIEW_QS=[];
 function syncPreview(){ $("bits").value=(window.KSR_PREVIEW_QS||[]).map((q,i)=>`${i+1}. ${q.q}\nA. ${q.o[0]||""}\nB. ${q.o[1]||""}\nC. ${q.o[2]||""}\nD. ${q.o[3]||""}\nAnswer: ${"ABCD"[Number(q.a)||0]}`).join("\n\n") }
-function renderPreview(){const raw=$("bits").value||"";const qs=parseQuestions(raw);window.KSR_PREVIEW_QS=qs;const expected=expectedCount(raw)||qs.length;const issues=[];qs.forEach((q,i)=>{if(!q.q)issues.push(`Q${i+1}: Question missing`);if((q.o||[]).filter(Boolean).length<4)issues.push(`Q${i+1}: Options incomplete`)});if(expected&&qs.length<expected)issues.push(`Expected ${expected}, detected ${qs.length}`);const ready=qs.length>0&&issues.length===0&&qs.length<=200;$("bitsPreviewBox").innerHTML=`<div class="pv3-panel"><h3>👀 Parser V3 Clean Preview</h3><div class="stat-grid"><div class="stat"><div class="label">Expected</div><div class="value">${expected}</div></div><div class="stat"><div class="label">Detected</div><div class="value">${qs.length}</div></div><div class="stat"><div class="label">Issues</div><div class="value">${issues.length}</div></div><div class="stat"><div class="label">Limit</div><div class="value">200</div></div></div>${ready?'<div class="pv3-ready">✅ Ready to Save</div>':'<div class="pv3-issue">⚠️ Check required</div>'}${issues.length?'<div class="pv3-bad">'+issues.map(x=>`<div>${esc(x)}</div>`).join("")+'</div>':""}<div class="pv3-actions"><button class="p" type="button" id="savePreviewBtn">✅ Save Preview Questions</button><button class="s" type="button" id="autoFixBtn">🤖 Auto Fix</button></div>${qs.map((q,i)=>questionCard(i,q)).join("")}</div>`;$("savePreviewBtn").onclick=()=>{syncPreview();saveExam()};$("autoFixBtn").onclick=()=>{syncPreview();renderPreview()};$("bitsPreviewBox").scrollIntoView({behavior:"smooth",block:"start"})}
+function renderPreview(){const raw=$("bits").value||"";const qs=parseQuestions(raw);window.KSR_PREVIEW_QS=qs;const expected=expectedCount(raw)||qs.length;const issues=[];qs.forEach((q,i)=>{if(!q.q)issues.push(`Q${i+1}: Question missing`);if((q.o||[]).filter(Boolean).length<4)issues.push(`Q${i+1}: Options incomplete`)});if(expected&&qs.length<expected)issues.push(`Expected ${expected}, detected ${qs.length}`);const ready=qs.length>0&&issues.length===0&&qs.length<=200;$("bitsPreviewBox").innerHTML=`<div class="pv3-panel"><h3>👀 Parser V4 Boundary Preview</h3><div class="stat-grid"><div class="stat"><div class="label">Expected</div><div class="value">${expected}</div></div><div class="stat"><div class="label">Detected</div><div class="value">${qs.length}</div></div><div class="stat"><div class="label">Issues</div><div class="value">${issues.length}</div></div><div class="stat"><div class="label">Limit</div><div class="value">200</div></div></div>${ready?'<div class="pv3-ready">✅ Ready to Save</div>':'<div class="pv3-issue">⚠️ Check required</div>'}${issues.length?'<div class="pv3-bad">'+issues.map(x=>`<div>${esc(x)}</div>`).join("")+'</div>':""}<div class="pv3-actions"><button class="p" type="button" id="savePreviewBtn">✅ Save Preview Questions</button><button class="s" type="button" id="autoFixBtn">🤖 Auto Fix</button></div>${qs.map((q,i)=>questionCard(i,q)).join("")}</div>`;$("savePreviewBtn").onclick=()=>{syncPreview();saveExam()};$("autoFixBtn").onclick=()=>{syncPreview();renderPreview()};$("bitsPreviewBox").scrollIntoView({behavior:"smooth",block:"start"})}
 function questionCard(i,q){const a=Number(q.a)||0,o=q.o||["","","",""];return `<div class="pv3-q"><h3>Q${i+1}. ${qHtml(q.q)}</h3>${[0,1,2,3].map(n=>`<div class="pv3-opt ${a===n?'pv3-correct':''}">${"ABCD"[n]}) ${esc(o[n]||"")}</div>`).join("")}<b>Answer: ${"ABCD"[a]}</b> <span class="pill">${esc(q.subject||"General")}</span></div>`}
 $("previewBitsBtn").onclick=renderPreview;
 

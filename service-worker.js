@@ -1,4 +1,4 @@
-const CACHE = 'ksr-no-cache-v1';
+const CACHE = 'ksr-no-cache-v4';
 
 self.addEventListener('install', event => {
   self.skipWaiting();
